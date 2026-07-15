@@ -286,7 +286,13 @@
   body.dark-mode .modal-overlay { background: rgba(0,0,0,0.6); }
   body.dark-mode tr:hover td { background: rgba(255,255,255,0.04); }
   body.dark-mode .toast { background: #2c2c3a; color: #ECECF5; }
-  body.dark-mode .pdf-content { background: #fff; color: #1A1A2E; }
+  /* Preview dokumen (PO/SJ/Invoice/STTP) selalu ditampilin di atas kertas putih, jadi
+     semua turunannya dipaksa pakai palet terang biar gak ketiban var(--text) mode gelap
+     (aturan global `td { color: var(--text) }` bikin tulisan putih-di-putih pas dark mode). */
+  body.dark-mode .pdf-content { background: #fff; color: #1A1A2E; --text: #1A1A2E; --text-muted: #666; --border: #000; --bg: #fff; }
+  body.dark-mode .pdf-content td,
+  body.dark-mode .pdf-content th,
+  body.dark-mode .pdf-content tr:hover td { color: #1A1A2E; background: transparent; }
   body.dark-mode .logo-preview { background: var(--bg); }
   body.dark-mode .slider:before { background-color: #ECECF5; }
 </style>
@@ -542,6 +548,7 @@
             <div class="table-title">📜 Riwayat Pembayaran Transfer</div>
             <div style="font-size:13px;color:var(--text-muted)">Tiap transfer masuk & invoice mana aja yang di-cover — biar gampang tracking</div>
           </div>
+          <button class="btn btn-success" onclick="exportTableToExcel('payments')">📤 Export Excel</button>
         </div>
         <div class="table-scroll">
           <table>
@@ -2815,6 +2822,37 @@ function exportTableToExcel(type) {
         'Status Pembayaran': st.key === 'lunas' ? 'Lunas' : (st.key === 'overdue' ? 'Telat Bayar' : (st.key === 'warning' ? 'Segera Jatuh Tempo' : 'Pending')),
         'Tanggal Dibayar': s.paidDate || '-',
         'Catatan': s.notes || '-'
+      });
+    });
+  } else if (type === 'payments') {
+    filename = 'Export-Riwayat-Pembayaran';
+    const sorted = [...(data.payments || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+    sorted.forEach(p => {
+      const outletName = data.customers.find(c => c.id == p.customerId)?.name || 'Unknown';
+      // Satu baris per invoice yang di-cover transfer ini. Nominal total transfer
+      // cuma dimunculin di baris invoice PERTAMA aja, sisanya dikosongin — biar kalau
+      // kolom "Nominal Transfer" di-total di Excel, gak double-count transfernya.
+      let invList = [];
+      if (Array.isArray(p.invBreakdown) && p.invBreakdown.length > 0) {
+        invList = p.invBreakdown.map(b => ({ no: b.no, amount: b.amount }));
+      } else if (Array.isArray(p.invNos) && p.invNos.length > 0) {
+        invList = p.invNos.map(no => {
+          const inv = data.invs.find(i => i.no === no);
+          const amt = inv ? inv.items.reduce((s, i) => s + i.qty * i.price, 0) - (inv.discount || 0) : null;
+          return { no, amount: amt };
+        });
+      } else {
+        invList = [{ no: '-', amount: null }];
+      }
+      invList.forEach((inv, idx) => {
+        rows.push({
+          'Tanggal TF': p.date,
+          'Outlet': outletName,
+          'No Invoice': inv.no,
+          'Nominal Invoice': inv.amount !== null ? inv.amount : '',
+          'Nominal Transfer': idx === 0 ? p.amount : '',
+          'Catatan': p.notes || ''
+        });
       });
     });
   }
