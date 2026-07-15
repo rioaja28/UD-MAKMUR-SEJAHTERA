@@ -4216,25 +4216,42 @@ function terbilang(n) {
   return convert(n).replace(/\s+/g, ' ').trim() + ' Rupiah';
 }
 
+// Nama bulan Indonesia (dipakai untuk format nama file download)
+const BULAN_INDO = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
+
+// Format nama file: YYYYMMDD_TIPE_NAMAOUTLET_D_BULAN_YY
+// Contoh: 20260714_SJ_KINKO_14_JULI_26
+function buildDocFileName(type, doc, partyName) {
+  const typeCode = { po: 'PO', so: 'SJ', inv: 'INV' }[type] || String(type).toUpperCase();
+  const dt = parseLocalDate(doc.date);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getDate()).padStart(2, '0');
+  const monthName = BULAN_INDO[dt.getMonth()];
+  const yy = String(yyyy).slice(-2);
+  const firstWord = (partyName || 'OUTLET').trim().split(/\s+/)[0].toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return `${yyyy}${mm}${dd}_${typeCode}_${firstWord}_${dt.getDate()}_${monthName}_${yy}`;
+}
+
 function generatePDFPreview(type) {
   const data = loadData();
   const doc = pdfDocData.doc;
   const profile = getCompanyProfile();
-  const logo = profile.logo;
   
-  const typeLabels = { po: 'PO Outlet', so: 'Surat Jalan', inv: 'Invoice' };
+  const typeLabels = { po: 'PO OUTLET', so: 'SURAT JALAN', inv: 'INVOICE' };
   const isSJ = type === 'so';
   const isInv = type === 'inv';
+  const isPO = type === 'po';
   
   let partyLabel, partyName, partyAddr, partyPhone;
-  if (type === 'po') {
+  if (isPO) {
     partyLabel = 'Outlet';
     const supplier = data.customers.find(c => c.id == doc.supplier);
     partyName = supplier?.name || 'Unknown';
     partyAddr = supplier?.address || '';
     partyPhone = supplier?.phone || '';
   } else {
-    partyLabel = 'Kepada Yth';
+    partyLabel = isSJ ? 'Dikirim Ke' : 'Kepada Yth';
     const customer = data.customers.find(c => c.id == doc.customer);
     partyName = customer?.name || 'Unknown';
     partyAddr = customer?.address || '';
@@ -4244,152 +4261,105 @@ function generatePDFPreview(type) {
   const calcTotal = (items) => items.reduce((sum, item) => sum + (item.qty * item.price), 0);
   const total = calcTotal(doc.items);
   const discount = doc.discount || 0;
-  const ppn = 0;
-  const grandTotal = Math.max(0, total - discount) + ppn;
+  const grandTotal = Math.max(0, total - discount);
   
-  // Unified item rows — semua tipe tampilkan: Nama, Qty+UOM, Harga Satuan, Subtotal
+  // Tabel item — No, Nama Barang, Qty, Satuan, Harga, Total Harga (sesuai format SJ fisik)
   let itemRows = doc.items.map((item, idx) => {
     const subtotal = item.qty * item.price;
-    const bg = idx % 2 === 1 ? 'background:#F8F6FF' : '';
+    const bg = idx % 2 === 1 ? 'background:#F5F5F5' : '';
     return `<tr style="${bg}">
-      <td style="padding:10px 12px">${item.name}</td>
-      <td style="text-align:center;padding:10px 12px">${item.qty} ${item.uom || 'pcs'}</td>
-      <td style="text-align:right;padding:10px 12px">Rp ${item.price?.toLocaleString('id-ID') || '0'}</td>
-      <td style="text-align:right;padding:10px 12px">Rp ${subtotal.toLocaleString('id-ID')}</td>
+      <td style="padding:8px 10px;text-align:center">${idx + 1}</td>
+      <td style="padding:8px 10px">${item.name}</td>
+      <td style="text-align:center;padding:8px 10px">${item.qty}</td>
+      <td style="text-align:center;padding:8px 10px">${item.uom || 'pcs'}</td>
+      <td style="text-align:right;padding:8px 10px">${item.price?.toLocaleString('id-ID') || '0'}</td>
+      <td style="text-align:right;padding:8px 10px">${subtotal.toLocaleString('id-ID')}</td>
     </tr>`;
   }).join('');
-  
-  // Totals — hanya untuk SJ dan PO
-  let totalsHtml = '';
-  if (!isInv) {
-    totalsHtml = `
-      <table style="border-collapse:collapse;width:100%;margin-top:16px">
-        <tr>
-          <td style="padding:6px 16px;color:#8A8A9A;font-size:13px">Subtotal</td>
-          <td style="padding:6px 16px;text-align:right;font-size:13px;width:160px">Rp ${total.toLocaleString('id-ID')}</td>
-        </tr>
-        <tr>
-          <td style="padding:6px 16px;color:#8A8A9A;font-size:13px">Diskon</td>
-          <td style="padding:6px 16px;text-align:right;font-size:13px;width:160px">- Rp ${discount.toLocaleString('id-ID')}</td>
-        </tr>
-        <tr>
-          <td style="padding:6px 16px;color:#8A8A9A;font-size:13px">PPN</td>
-          <td style="padding:6px 16px;text-align:right;font-size:13px;width:160px">Rp ${ppn.toLocaleString('id-ID')}</td>
-        </tr>
-        <tr style="border-top:2px solid #1E5A96">
-          <td style="padding:10px 16px;font-weight:700;font-size:14px">TOTAL</td>
-          <td style="padding:10px 16px;text-align:right;font-weight:700;font-size:16px;color:#1E5A96;width:160px">Rp ${grandTotal.toLocaleString('id-ID')}</td>
-        </tr>
-      </table>
-    `;
-  }
 
-  // Info tanggal tambahan di header (hanya PO yang masih pakai TGL KIRIM di sini)
-  let extraDateHtml = '';
-  if (type === 'po' && doc.deliveryDate) {
-    extraDateHtml = `<p style="margin:6px 0 0;font-size:12px;color:#8A8A9A">TGL KIRIM</p><p style="margin:2px 0;font-weight:600">${fmtDate(doc.deliveryDate)}</p>`;
-  }
-
-  // Detail kanan — sejajar dengan nama & alamat pihak yang dituju
-  // SJ: No PO, Tanggal Order, Tanggal Kirim | INV: No PO, No SJ, Term Payment
-  let detailRightHtml = '';
-  if (isSJ) {
-    const poRef = doc.poNo ? data.pos.find(p => p.no === doc.poNo) : null;
-    const tglOrder = poRef?.date || doc.date;  // Tanggal Order = dari PO, fallback ke SJ
-    const tglKirim = doc.date;                 // Tanggal Kirim = tanggal SJ
-    let rows = '';
-    if (doc.poNo) rows += `<p style="font-size:12px;color:#8A8A9A;margin-top:6px">No PO: <strong>${doc.poNo}</strong></p>`;
-    rows += `<p style="font-size:12px;color:#8A8A9A;margin-top:6px">Tanggal Order: <strong>${fmtDate(tglOrder)}</strong></p>`;
-    rows += `<p style="font-size:12px;color:#8A8A9A;margin-top:2px">Tanggal Kirim: <strong>${fmtDate(tglKirim)}</strong></p>`;
-    detailRightHtml = rows;
+  // Detail kanan header — No PO / No SJ / No Invoice berjenjang sesuai referensi dokumen
+  let detailRightHtml = `<p style="font-size:12px;margin-top:6px">Tanggal : <strong>${fmtDate(doc.date)}</strong></p>`;
+  if (isPO) {
+    detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. PO : <strong>${doc.no}</strong></p>`;
+    if (doc.deliveryDate) detailRightHtml += `<p style="font-size:12px;margin-top:2px">Tgl Kirim : <strong>${fmtDate(doc.deliveryDate)}</strong></p>`;
+  } else if (isSJ) {
+    if (doc.poNo) detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. PO : <strong>${doc.poNo}</strong></p>`;
+    detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. SJ : <strong>${doc.no}</strong></p>`;
   } else if (isInv) {
     const soRecord = doc.soNo ? data.sos.find(s => s.no === doc.soNo) : null;
     const refPoNo = soRecord?.poNo || doc.poNo || null;
-    const tglKirim = soRecord?.date || doc.deliveryDate || null; // Tanggal Kirim dari SJ referensi
-    let rows = '';
-    if (refPoNo) rows += `<p style="font-size:12px;color:#8A8A9A;margin-top:6px">No PO: <strong>${refPoNo}</strong></p>`;
-    if (doc.soNo) rows += `<p style="font-size:12px;color:#8A8A9A;margin-top:2px">No SJ: <strong>${doc.soNo}</strong></p>`;
-    if (tglKirim) rows += `<p style="font-size:12px;color:#8A8A9A;margin-top:2px">Tanggal Kirim: <strong>${fmtDate(tglKirim)}</strong></p>`;
-    rows += `<p style="font-size:12px;color:#8A8A9A;margin-top:2px">Term Payment: <strong>7 Hari</strong></p>`;
-    detailRightHtml = rows;
+    if (refPoNo) detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. PO : <strong>${refPoNo}</strong></p>`;
+    if (doc.soNo) detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. SJ : <strong>${doc.soNo}</strong></p>`;
+    detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. Invoice : <strong>${doc.no}</strong></p>`;
+    detailRightHtml += `<p style="font-size:12px;margin-top:2px">Term Payment : <strong>7 Hari</strong></p>`;
   }
 
-  // Catatan — khusus Surat Jalan, kotak lebar 80%
-  let catatanHtml = '';
-  if (isSJ) {
-    catatanHtml = `
-      <div style="width:80%;margin-top:20px;padding:14px 16px;border:1px solid #BBDEFB;border-radius:10px;background:#FAFAFE">
-        <div style="font-size:12px;font-weight:700;color:#1E5A96;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Catatan</div>
-        <div style="font-size:13px;color:#555">${doc.notes || '-'}</div>
+  // Terbilang + Subtotal/Diskon/Total — untuk SEMUA jenis dokumen
+  const summaryHtml = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-top:20px;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px;padding:12px 16px;border:1px solid #000">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Terbilang</div>
+        <div style="font-weight:700;font-size:13px">${terbilang(grandTotal)}</div>
       </div>
-    `;
-  }
+      <table style="border-collapse:collapse;min-width:220px">
+        <tr>
+          <td style="padding:4px 8px;font-size:13px">Subtotal</td>
+          <td style="padding:4px 8px;text-align:right;font-size:13px;width:140px">${total.toLocaleString('id-ID')}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 8px;font-size:13px">Diskon</td>
+          <td style="padding:4px 8px;text-align:right;font-size:13px;width:140px">${discount.toLocaleString('id-ID')}</td>
+        </tr>
+        <tr style="border-top:2px solid #000">
+          <td style="padding:8px 8px 4px;font-weight:700;font-size:14px">TOTAL</td>
+          <td style="padding:8px 8px 4px;text-align:right;font-weight:700;font-size:15px;width:140px">${grandTotal.toLocaleString('id-ID')}</td>
+        </tr>
+      </table>
+    </div>
+  `;
 
-  // Terbilang & Payment — khusus Invoice
-  let terbilangHtml = '';
+  // Catatan — untuk semua jenis dokumen
+  const catatanHtml = `
+    <div style="margin-top:16px;padding:12px 16px;border:1px solid #000">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Catatan</div>
+      <div style="font-size:13px">${doc.notes || '-'}</div>
+    </div>
+  `;
+
+  // Payment — khusus Invoice
   let paymentHtml = '';
   if (isInv) {
-    terbilangHtml = `
-      <div style="display:flex;justify-content:center;align-items:flex-start;gap:32px;margin-top:16px">
-        <div style="max-width:340px;min-width:300px;padding:14px 18px;border:1px solid #BBDEFB;border-radius:7px;background:#FAFAFE;margin-top:20px">
-          <div style="font-size:12px;color:#8A8A9A;margin-bottom:4px">Terbilang</div>
-          <div style="font-weight:700;font-size:13px;color:#1A1A2E">${terbilang(grandTotal)}</div>
-        </div>
-        <table style="border-collapse:collapse;flex:1">
-          <tr>
-            <td style="padding:4px 8px;color:#8A8A9A;font-size:13px">Subtotal</td>
-            <td style="padding:4px 8px;text-align:right;font-size:13px;width:160px">Rp ${total.toLocaleString('id-ID')}</td>
-          </tr>
-          <tr>
-            <td style="padding:4px 8px;color:#8A8A9A;font-size:13px">Diskon</td>
-            <td style="padding:4px 8px;text-align:right;font-size:13px;width:160px">- Rp ${discount.toLocaleString('id-ID')}</td>
-          </tr>
-          <tr style="border-bottom:2px solid #1E5A96">
-            <td style="padding:4px 8px;color:#8A8A9A;font-size:13px">PPN</td>
-            <td style="padding:4px 8px;text-align:right;font-size:13px;width:160px">Rp ${ppn.toLocaleString('id-ID')}</td>
-          </tr>
-          <tr>
-            <td style="padding:8px 8px 4px;font-weight:700;font-size:14px">TOTAL</td>
-            <td style="padding:8px 8px 4px;text-align:right;font-weight:700;font-size:16px;color:#1E5A96;width:160px">Rp ${grandTotal.toLocaleString('id-ID')}</td>
-          </tr>
-        </table>
-      </div>
-    `;
     const paymentData = data.payment || {};
     const bankName = paymentData.bankName || 'BCA';
     const accountNumber = paymentData.accountNumber || '108-298-2153';
     const accountHolder = paymentData.accountHolder || 'KHANSA DWI AGUSTINA';
     paymentHtml = `
       <div style="display:flex;justify-content:flex-start;margin-top:14px">
-        <div style="padding:8px 10px;border:1px solid #BBDEFB;border-radius:6px;background:#FAFAFE;max-width:240px">
-          <div style="font-size:10px;font-weight:700;color:#1E5A96;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Payment</div>
+        <div style="padding:8px 10px;border:1px solid #000;max-width:240px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Payment</div>
           <table style="border-collapse:collapse;font-size:10px">
-            <tr><td style="padding:1px 6px 1px 0;color:#8A8A9A;white-space:nowrap;font-size:10px">Nama Bank</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${bankName}</td></tr>
-            <tr><td style="padding:1px 6px 1px 0;color:#8A8A9A;white-space:nowrap;font-size:10px">No Rekening</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${accountNumber}</td></tr>
-            <tr><td style="padding:1px 6px 1px 0;color:#8A8A9A;white-space:nowrap;font-size:10px">Atas Nama</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${accountHolder}</td></tr>
+            <tr><td style="padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Nama Bank</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${bankName}</td></tr>
+            <tr><td style="padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">No Rekening</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${accountNumber}</td></tr>
+            <tr><td style="padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Atas Nama</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${accountHolder}</td></tr>
           </table>
         </div>
       </div>
     `;
   }
 
-  // Tanda tangan — semua tipe (PO: Dibuat & Disetujui, SJ: Pengirim & Penerima, INV: Dibuat & Diterima)
-  let sigLabels;
-  if (type === 'po') sigLabels = ['Dibuat Oleh', 'Disetujui Oleh'];
-  else if (isSJ) sigLabels = [`Pengirim${doc.driver ? ' (' + doc.driver + ')' : ''}`, `Penerima`];
-  else sigLabels = ['Dibuat Oleh', `Diterima`];
-
+  // Tanda tangan — seragam untuk semua jenis dokumen
+  const sigLabels = ['Yang Menerima', 'Dibuat Oleh'];
   const signatureHtml = `
-    <div style="display:flex;justify-content:space-between;margin-top:34px;font-size:12px;color:#555">
+    <div style="display:flex;justify-content:space-between;margin-top:34px;font-size:12px">
       <div style="text-align:center">
         <div style="margin-bottom:0">${sigLabels[0]}</div>
         <div style="height:80px"></div>
-        <div style="border-top:1px solid #333;width:160px;margin:0 auto"></div>
+        <div style="border-top:1px solid #000;width:160px;margin:0 auto"></div>
       </div>
       <div style="text-align:center">
         <div style="margin-bottom:0">${sigLabels[1]}</div>
         <div style="height:80px"></div>
-        <div style="border-top:1px solid #333;width:160px;margin:0 auto"></div>
+        <div style="border-top:1px solid #000;width:160px;margin:0 auto"></div>
       </div>
     </div>
   `;
@@ -4397,55 +4367,46 @@ function generatePDFPreview(type) {
   const pdfContent = document.getElementById('pdfContent');
   pdfContent.innerHTML = `
     <div class="pdf-content">
-      <!-- HEADER: Logo + Nama Perusahaan kiri | Judul Dokumen kanan -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:20px;border-bottom:2px solid #1E5A96;gap:16px">
-        <div style="display:flex;align-items:center;gap:14px;min-width:0;flex:1 1 auto;max-width:60%">
-          ${logo ? `<img src="${logo}" style="width:64px;height:64px;border-radius:8px;object-fit:cover;flex-shrink:0">` : '<div style="width:64px;height:64px;border-radius:8px;background:#E3F2FD;display:flex;align-items:center;justify-content:center;color:#1E5A96;font-weight:700;font-size:20px;flex-shrink:0">IJ</div>'}
-          <div style="min-width:0">
-            <div style="font-size:17px;font-weight:700;color:#1A1A2E;word-break:break-word;overflow-wrap:break-word">${profile.name}</div>
-            ${profile.address ? `<div style="font-size:11px;color:#8A8A9A;margin-top:2px;word-break:break-word;overflow-wrap:break-word">${profile.address}</div>` : ''}
-            ${profile.phone ? `<div style="font-size:11px;color:#8A8A9A;word-break:break-word;overflow-wrap:break-word">Telp: ${profile.phone}</div>` : ''}
-          </div>
+      <!-- HEADER: Nama Perusahaan kiri (polos, tanpa logo) | Judul Dokumen kanan -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #000;gap:16px">
+        <div style="min-width:0;flex:1 1 auto;max-width:55%">
+          <div style="font-size:16px;font-weight:700;word-break:break-word;overflow-wrap:break-word">${profile.name}</div>
+          ${profile.address ? `<div style="font-size:11px;margin-top:2px;word-break:break-word;overflow-wrap:break-word">${profile.address}</div>` : ''}
+          ${profile.phone ? `<div style="font-size:11px;word-break:break-word;overflow-wrap:break-word">Telp: ${profile.phone}</div>` : ''}
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <h1 style="color:#1E5A96;font-size:${type === 'po' ? 22 : (isInv ? 40 : 30)}px;margin:0 0 4px">${typeLabels[type]}</h1>
-          <p style="margin:0;font-size:13px;font-weight:600;color:#1A1A2E">${doc.no}</p>
-          <p style="margin:8px 0 0;font-size:11px;color:#8A8A9A">TANGGAL</p>
-          <p style="margin:2px 0;font-weight:600;font-size:13px">${fmtDate(doc.date)}</p>
-          ${extraDateHtml}
-        </div>
-      </div>
-      
-      <!-- INFO: Pihak & Detail Dokumen -->
-      <div class="doc-header" style="margin-bottom:20px">
-        <div>
-          <p style="font-size:11px;color:#8A8A9A;text-transform:uppercase;margin-bottom:4px">${partyLabel}</p>
-          <strong style="font-size:15px">${partyName}</strong>
-          ${partyAddr ? `<p style="font-size:12px;color:#8A8A9A;margin-top:4px">${partyAddr}</p>` : ''}
-          ${partyPhone ? `<p style="font-size:12px;color:#8A8A9A">Telp: ${partyPhone}</p>` : ''}
-        </div>
-        <div style="text-align:right">
+          <h1 style="color:#000;font-size:24px;letter-spacing:0.5px;margin:0 0 6px">${typeLabels[type]}</h1>
           ${detailRightHtml}
-          ${(!isSJ && doc.notes) ? `<p style="font-size:12px;color:#8A8A9A;margin-top:10px;max-width:200px">📝 ${doc.notes}</p>` : ''}
         </div>
       </div>
       
-      <!-- TABEL ITEM — kolom seragam untuk semua tipe -->
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;border:1px solid #BBDEFB;border-radius:8px;overflow:hidden">
+      <!-- INFO: Pihak yang dituju -->
+      <div class="doc-header" style="margin-bottom:16px">
+        <div>
+          <p style="font-size:11px;text-transform:uppercase;margin-bottom:4px">${partyLabel}</p>
+          <strong style="font-size:15px">${partyName}</strong>
+          ${partyAddr ? `<p style="font-size:12px;margin-top:4px">${partyAddr}</p>` : ''}
+          ${partyPhone ? `<p style="font-size:12px">Telp: ${partyPhone}</p>` : ''}
+        </div>
+      </div>
+      
+      <!-- TABEL ITEM -->
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;border:1px solid #000">
         <thead>
-          <tr style="background:#0F2D52">
-            <th style="text-align:left;padding:12px;font-size:12px;color:#ffffff;background:#0F2D52;text-transform:uppercase;letter-spacing:0.5px">Nama Barang</th>
-            <th style="text-align:center;padding:12px;font-size:12px;color:#ffffff;background:#0F2D52;text-transform:uppercase;letter-spacing:0.5px">Qty / UOM</th>
-            <th style="text-align:right;padding:12px;font-size:12px;color:#ffffff;background:#0F2D52;text-transform:uppercase;letter-spacing:0.5px">Harga Satuan</th>
-            <th style="text-align:right;padding:12px;font-size:12px;color:#ffffff;background:#0F2D52;text-transform:uppercase;letter-spacing:0.5px">Subtotal</th>
+          <tr style="background:#000">
+            <th style="text-align:center;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px;width:36px">No</th>
+            <th style="text-align:left;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Nama Barang</th>
+            <th style="text-align:center;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Qty</th>
+            <th style="text-align:center;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Satuan</th>
+            <th style="text-align:right;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Harga</th>
+            <th style="text-align:right;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Total Harga</th>
           </tr>
         </thead>
-        <tbody style="border-top:2px solid #0F2D52">${itemRows}</tbody>
+        <tbody style="border-top:1px solid #000">${itemRows}</tbody>
       </table>
       
-      ${totalsHtml}
+      ${summaryHtml}
       ${catatanHtml}
-      ${terbilangHtml}
       ${paymentHtml}
       ${signatureHtml}
     </div>
@@ -4483,11 +4444,10 @@ window.addEventListener('orientationchange', () => {
 });
 
 function downloadPDF() {
-  const typeLabels = { po: 'PO-Outlet', so: 'Surat-Jalan', inv: 'Invoice' };
   const type = pdfDocData.type;
   const d = pdfDocData.doc;
 
-  // Bangun nama file: SJ-(No SJ)-IJB-(nama outlet)-(YYYYMMDD), INV-(No INV)-IJB-(nama outlet)-(YYYYMMDD)
+  // Nama file: YYYYMMDD_TIPE_NAMAOUTLET_D_BULAN_YY (mis. 20260714_SJ_KINKO_14_JULI_26)
   const buildFileName = () => {
     const data = loadData();
     let partyName = 'Outlet';
@@ -4498,13 +4458,7 @@ function downloadPDF() {
       const customer = data.customers.find(c => c.id == d.customer);
       partyName = customer?.name || 'Outlet';
     }
-    const safeParty = partyName.replace(/[\\/:*?"<>|]/g, '').trim().replace(/\s+/g, '_');
-    const dt = new Date(d.date);
-    const tgl = `${dt.getFullYear()}${String(dt.getMonth() + 1).padStart(2, '0')}${String(dt.getDate()).padStart(2, '0')}`;
-
-    if (type === 'so') return `${d.no}-IJB-${safeParty}-${tgl}.pdf`;
-    if (type === 'inv') return `${d.no}-IJB-${safeParty}-${tgl}.pdf`;
-    return `${typeLabels[type]}-${d.no}.pdf`;
+    return `${buildDocFileName(type, d, partyName)}.pdf`;
   };
   const fileName = buildFileName();
 
@@ -6016,7 +5970,6 @@ function printDoc(containerId) {
 // Samakan format nama file dot matrix dengan Download PDF biasa — dipakai untuk
 // nama file Download maupun judul window Cetak (jadi default nama kalau "Save as PDF")
 function dotMatrixPrintTitleSafe(containerId) {
-  const typeLabels = { po: 'PO-Outlet', so: 'Surat-Jalan', inv: 'Invoice' };
   if (containerId === 'pdfContent') {
     const type = pdfDocData.type;
     const d = pdfDocData.doc;
@@ -6030,11 +5983,7 @@ function dotMatrixPrintTitleSafe(containerId) {
       const customer = data.customers.find(c => c.id == d.customer);
       partyName = customer?.name || 'Outlet';
     }
-    const safeParty = partyName.replace(/[\\/:*?"<>|]/g, '').trim().replace(/\s+/g, '_');
-    const dt = new Date(d.date);
-    const tgl = `${dt.getFullYear()}${String(dt.getMonth() + 1).padStart(2, '0')}${String(dt.getDate()).padStart(2, '0')}`;
-    if (type === 'so' || type === 'inv') return `${d.no}-IJB-${safeParty}-${tgl}`;
-    return `${typeLabels[type]}-${d.no}`;
+    return buildDocFileName(type, d, partyName);
   } else {
     const sttp = currentSttpData;
     if (!sttp) return `DotMatrix-${today()}`;
