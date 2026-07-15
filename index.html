@@ -1746,7 +1746,19 @@ function flushCloudSave() {
     hasUnsyncedChanges = false;
   }).catch(err => {
     console.error('Gagal menyimpan ke cloud:', err);
-    showToast('Gagal sinkron ke cloud. Cek koneksi internet.');
+    // Tampilkan kode error asli (bukan cuma "cek koneksi") — supaya kelihatan
+    // kalau penyebabnya BUKAN jaringan, misal permission-denied (Firestore
+    // Security Rules nolak nulis) atau invalid-argument (ada data gak valid).
+    const code = err && err.code ? err.code : 'unknown';
+    let msg = 'Gagal sinkron ke cloud (' + code + ').';
+    if (code === 'permission-denied') {
+      msg = 'Gagal sinkron: akun ini tidak punya izin menulis ke cloud (cek Firestore Security Rules).';
+    } else if (code === 'unavailable') {
+      msg = 'Gagal sinkron ke cloud. Cek koneksi internet.';
+    } else if (code === 'invalid-argument') {
+      msg = 'Gagal sinkron: ada data yang tidak valid (mis. nilai undefined).';
+    }
+    showToast(msg);
   });
 }
 
