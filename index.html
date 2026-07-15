@@ -1323,8 +1323,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('pdfModal')">Tutup</button>
-      <button class="btn btn-success" onclick="printDoc('pdfContent')">🖨️ Cetak (Dot Matrix)</button>
-      <button class="btn btn-pdf" onclick="downloadDotMatrixPDF('pdfContent')">⬇️ PDF Dot Matrix</button>
+      <button class="btn btn-success" onclick="printDocPlain('pdfContent')">🖨️ Cetak</button>
       <button class="btn btn-primary" onclick="downloadPDF()">⬇️ Download PDF</button>
     </div>
   </div>
@@ -4237,6 +4236,8 @@ function generatePDFPreview(type) {
   const data = loadData();
   const doc = pdfDocData.doc;
   const profile = getCompanyProfile();
+  const logo = profile.logo;
+  const initials = (profile.name || 'IJ').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
   
   const typeLabels = { po: 'PO OUTLET', so: 'SURAT JALAN', inv: 'INVOICE' };
   const isSJ = type === 'so';
@@ -4251,7 +4252,7 @@ function generatePDFPreview(type) {
     partyAddr = supplier?.address || '';
     partyPhone = supplier?.phone || '';
   } else {
-    partyLabel = isSJ ? 'Dikirim Ke' : 'Kepada Yth';
+    partyLabel = isSJ ? 'Dikirim ke' : 'Kepada Yth';
     const customer = data.customers.find(c => c.id == doc.customer);
     partyName = customer?.name || 'Unknown';
     partyAddr = customer?.address || '';
@@ -4262,67 +4263,63 @@ function generatePDFPreview(type) {
   const total = calcTotal(doc.items);
   const discount = doc.discount || 0;
   const grandTotal = Math.max(0, total - discount);
+
+  const BORDER = '1px solid #000';
   
-  // Tabel item — No, Nama Barang, Qty, Satuan, Harga, Total Harga (sesuai format SJ fisik)
+  // Tabel item — No. Barang, Nama Barang, Qty, Satuan, Harga, Total Harga (grid penuh ala Excel)
   let itemRows = doc.items.map((item, idx) => {
-    const subtotal = item.qty * item.price;
-    const bg = idx % 2 === 1 ? 'background:#F5F5F5' : '';
-    return `<tr style="${bg}">
-      <td style="padding:8px 10px;text-align:center">${idx + 1}</td>
-      <td style="padding:8px 10px">${item.name}</td>
-      <td style="text-align:center;padding:8px 10px">${item.qty}</td>
-      <td style="text-align:center;padding:8px 10px">${item.uom || 'pcs'}</td>
-      <td style="text-align:right;padding:8px 10px">${item.price?.toLocaleString('id-ID') || '0'}</td>
-      <td style="text-align:right;padding:8px 10px">${subtotal.toLocaleString('id-ID')}</td>
+    return `<tr>
+      <td style="border:${BORDER};padding:6px 8px;text-align:center">${idx + 1}</td>
+      <td style="border:${BORDER};padding:6px 8px">${item.name}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:center">${item.qty}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:center">${item.uom || 'pcs'}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:right">${item.price?.toLocaleString('id-ID') || '0'}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:right">${(item.qty * item.price).toLocaleString('id-ID')}</td>
     </tr>`;
   }).join('');
 
-  // Detail kanan header — No PO / No SJ / No Invoice berjenjang sesuai referensi dokumen
-  let detailRightHtml = `<p style="font-size:12px;margin-top:6px">Tanggal : <strong>${fmtDate(doc.date)}</strong></p>`;
+  // Field kolom kiri: Tanggal / No. PO / No. SJ / No. Invoice — berjenjang sesuai referensi dokumen
+  let fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
   if (isPO) {
-    detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. PO : <strong>${doc.no}</strong></p>`;
-    if (doc.deliveryDate) detailRightHtml += `<p style="font-size:12px;margin-top:2px">Tgl Kirim : <strong>${fmtDate(doc.deliveryDate)}</strong></p>`;
+    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
+    if (doc.deliveryDate) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tgl Kirim</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.deliveryDate)}</strong></td></tr>`;
   } else if (isSJ) {
-    if (doc.poNo) detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. PO : <strong>${doc.poNo}</strong></p>`;
-    detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. SJ : <strong>${doc.no}</strong></p>`;
+    if (doc.poNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.poNo}</strong></td></tr>`;
+    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
   } else if (isInv) {
     const soRecord = doc.soNo ? data.sos.find(s => s.no === doc.soNo) : null;
     const refPoNo = soRecord?.poNo || doc.poNo || null;
-    if (refPoNo) detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. PO : <strong>${refPoNo}</strong></p>`;
-    if (doc.soNo) detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. SJ : <strong>${doc.soNo}</strong></p>`;
-    detailRightHtml += `<p style="font-size:12px;margin-top:2px">No. Invoice : <strong>${doc.no}</strong></p>`;
-    detailRightHtml += `<p style="font-size:12px;margin-top:2px">Term Payment : <strong>7 Hari</strong></p>`;
+    if (refPoNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${refPoNo}</strong></td></tr>`;
+    if (doc.soNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.soNo}</strong></td></tr>`;
+    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. Invoice</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
+    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Term Payment</td><td style="padding:2px 0;font-size:12px">: <strong>7 Hari</strong></td></tr>`;
   }
 
-  // Terbilang + Subtotal/Diskon/Total — untuk SEMUA jenis dokumen
+  // Terbilang + Subtotal/Diskon/Total Order — satu tabel bordered nyambung di bawah tabel item (semua jenis dokumen)
   const summaryHtml = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-top:20px;flex-wrap:wrap">
-      <div style="flex:1;min-width:260px;padding:12px 16px;border:1px solid #000">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Terbilang</div>
-        <div style="font-weight:700;font-size:13px">${terbilang(grandTotal)}</div>
-      </div>
-      <table style="border-collapse:collapse;min-width:220px">
-        <tr>
-          <td style="padding:4px 8px;font-size:13px">Subtotal</td>
-          <td style="padding:4px 8px;text-align:right;font-size:13px;width:140px">${total.toLocaleString('id-ID')}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 8px;font-size:13px">Diskon</td>
-          <td style="padding:4px 8px;text-align:right;font-size:13px;width:140px">${discount.toLocaleString('id-ID')}</td>
-        </tr>
-        <tr style="border-top:2px solid #000">
-          <td style="padding:8px 8px 4px;font-weight:700;font-size:14px">TOTAL</td>
-          <td style="padding:8px 8px 4px;text-align:right;font-weight:700;font-size:15px;width:140px">${grandTotal.toLocaleString('id-ID')}</td>
-        </tr>
-      </table>
-    </div>
+    <table style="width:100%;border-collapse:collapse;border:${BORDER};border-top:none">
+      <tr>
+        <td style="border:${BORDER};padding:8px;width:100px;vertical-align:top;font-size:12px">Terbilang</td>
+        <td style="border:${BORDER};padding:8px;vertical-align:top;font-size:12px" rowspan="3">${terbilang(grandTotal)}</td>
+        <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
+        <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px;width:120px">${total.toLocaleString('id-ID')}</td>
+      </tr>
+      <tr>
+        <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
+        <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
+      </tr>
+      <tr>
+        <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
+        <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
+      </tr>
+    </table>
   `;
 
-  // Catatan — untuk semua jenis dokumen
+  // Catatan — kotak bordered, label underline, untuk semua jenis dokumen
   const catatanHtml = `
-    <div style="margin-top:16px;padding:12px 16px;border:1px solid #000">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Catatan</div>
-      <div style="font-size:13px">${doc.notes || '-'}</div>
+    <div style="margin-top:20px;border:${BORDER};padding:10px 14px;min-height:70px">
+      <div style="font-size:12px;text-decoration:underline;margin-bottom:6px">Catatan</div>
+      <div style="font-size:12px">${doc.notes || ''}</div>
     </div>
   `;
 
@@ -4335,7 +4332,7 @@ function generatePDFPreview(type) {
     const accountHolder = paymentData.accountHolder || 'KHANSA DWI AGUSTINA';
     paymentHtml = `
       <div style="display:flex;justify-content:flex-start;margin-top:14px">
-        <div style="padding:8px 10px;border:1px solid #000;max-width:240px">
+        <div style="padding:8px 10px;border:${BORDER};max-width:240px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Payment</div>
           <table style="border-collapse:collapse;font-size:10px">
             <tr><td style="padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Nama Bank</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${bankName}</td></tr>
@@ -4347,62 +4344,54 @@ function generatePDFPreview(type) {
     `;
   }
 
-  // Tanda tangan — seragam untuk semua jenis dokumen
-  const sigLabels = ['Yang Menerima', 'Dibuat Oleh'];
+  // Tanda tangan — tabel bordered 2 kolom, "Yang Menerima" & "Dibuat Oleh"
   const signatureHtml = `
-    <div style="display:flex;justify-content:space-between;margin-top:34px;font-size:12px">
-      <div style="text-align:center">
-        <div style="margin-bottom:0">${sigLabels[0]}</div>
-        <div style="height:80px"></div>
-        <div style="border-top:1px solid #000;width:160px;margin:0 auto"></div>
-      </div>
-      <div style="text-align:center">
-        <div style="margin-bottom:0">${sigLabels[1]}</div>
-        <div style="height:80px"></div>
-        <div style="border-top:1px solid #000;width:160px;margin:0 auto"></div>
-      </div>
-    </div>
+    <table style="width:100%;border-collapse:collapse;margin-top:26px;border:${BORDER}">
+      <tr>
+        <td style="border:${BORDER};padding:8px;text-align:center;font-size:13px">Yang Menerima</td>
+        <td style="border:${BORDER};padding:8px;text-align:center;font-size:13px">Dibuat Oleh</td>
+      </tr>
+      <tr>
+        <td style="border:${BORDER};height:90px"></td>
+        <td style="border:${BORDER};height:90px"></td>
+      </tr>
+    </table>
   `;
 
   const pdfContent = document.getElementById('pdfContent');
   pdfContent.innerHTML = `
     <div class="pdf-content">
-      <!-- HEADER: Nama Perusahaan kiri (polos, tanpa logo) | Judul Dokumen kanan -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #000;gap:16px">
-        <div style="min-width:0;flex:1 1 auto;max-width:55%">
-          <div style="font-size:16px;font-weight:700;word-break:break-word;overflow-wrap:break-word">${profile.name}</div>
+      <!-- HEADER: Logo + Nama Perusahaan + field dokumen (kiri) | Judul + Dikirim ke (kanan) -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid #000;gap:20px">
+        <div style="min-width:0;flex:1 1 50%">
+          ${logo ? `<img src="${logo}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px">` : `<div style="font-size:26px;font-weight:800;margin-bottom:4px">${initials}</div>`}
+          <div style="font-size:13px;font-weight:700;word-break:break-word;overflow-wrap:break-word">${profile.name}</div>
           ${profile.address ? `<div style="font-size:11px;margin-top:2px;word-break:break-word;overflow-wrap:break-word">${profile.address}</div>` : ''}
           ${profile.phone ? `<div style="font-size:11px;word-break:break-word;overflow-wrap:break-word">Telp: ${profile.phone}</div>` : ''}
+          <table style="border-collapse:collapse;margin-top:14px">${fieldRows}</table>
         </div>
-        <div style="text-align:right;flex-shrink:0">
-          <h1 style="color:#000;font-size:24px;letter-spacing:0.5px;margin:0 0 6px">${typeLabels[type]}</h1>
-          ${detailRightHtml}
-        </div>
-      </div>
-      
-      <!-- INFO: Pihak yang dituju -->
-      <div class="doc-header" style="margin-bottom:16px">
-        <div>
-          <p style="font-size:11px;text-transform:uppercase;margin-bottom:4px">${partyLabel}</p>
-          <strong style="font-size:15px">${partyName}</strong>
-          ${partyAddr ? `<p style="font-size:12px;margin-top:4px">${partyAddr}</p>` : ''}
-          ${partyPhone ? `<p style="font-size:12px">Telp: ${partyPhone}</p>` : ''}
+        <div style="min-width:0;flex:1 1 50%">
+          <h1 style="color:#000;font-size:26px;font-weight:800;margin:0 0 10px">${typeLabels[type]}</h1>
+          <div style="font-size:12px">${partyLabel}</div>
+          <strong style="font-size:14px;text-decoration:underline;display:block;margin-top:2px">${partyName}</strong>
+          ${partyAddr ? `<div style="font-size:12px;margin-top:4px;white-space:pre-line">${partyAddr}</div>` : ''}
+          ${partyPhone ? `<div style="font-size:12px">Telp: ${partyPhone}</div>` : ''}
         </div>
       </div>
       
       <!-- TABEL ITEM -->
-      <table style="width:100%;border-collapse:collapse;margin:16px 0;border:1px solid #000">
+      <table style="width:100%;border-collapse:collapse;margin:0 0 0;border:${BORDER}">
         <thead>
-          <tr style="background:#000">
-            <th style="text-align:center;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px;width:36px">No</th>
-            <th style="text-align:left;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Nama Barang</th>
-            <th style="text-align:center;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Qty</th>
-            <th style="text-align:center;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Satuan</th>
-            <th style="text-align:right;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Harga</th>
-            <th style="text-align:right;padding:10px 8px;font-size:11px;color:#ffffff;background:#000;text-transform:uppercase;letter-spacing:0.5px">Total Harga</th>
+          <tr>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px">No. Barang</th>
+            <th style="border:${BORDER};text-align:left;padding:7px 8px;font-size:11px">Nama Barang</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px">Qty</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:80px">Satuan</th>
+            <th style="border:${BORDER};text-align:right;padding:7px 8px;font-size:11px;width:90px">Harga</th>
+            <th style="border:${BORDER};text-align:right;padding:7px 8px;font-size:11px;width:100px">Total Harga</th>
           </tr>
         </thead>
-        <tbody style="border-top:1px solid #000">${itemRows}</tbody>
+        <tbody>${itemRows}</tbody>
       </table>
       
       ${summaryHtml}
@@ -5936,6 +5925,48 @@ function restructureSignatureForDotMatrix(clone) {
 }
 
 // ── CETAK ke printer ──
+// Cetak langsung dari HTML preview asli (template-nya sendiri sudah polos & bordered,
+// jadi tidak perlu lagi proses "strip warna" seperti mode dot matrix lama)
+const PRINT_PLAIN_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; }
+  table { border-collapse: collapse; }
+  @media print {
+    @page { size: A4 portrait; margin: 12mm; }
+    thead { display: table-row-group !important; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
+  }
+`;
+
+function printDocPlain(containerId) {
+  const contentEl = document.querySelector('#' + containerId + ' .pdf-content');
+  if (!contentEl) { showToast('Tidak ada dokumen. Buka Preview terlebih dahulu.'); return; }
+
+  const printWin = window.open('', '_blank', 'width=900,height=700');
+  if (!printWin) { showToast('Popup diblokir browser. Izinkan popup untuk mencetak.'); return; }
+
+  printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${dotMatrixPrintTitleSafe(containerId)}</title>
+  <style>${PRINT_PLAIN_CSS}</style>
+</head>
+<body>
+  <div class="pdf-content">${contentEl.innerHTML}</div>
+  <script>
+    window.onload = function() {
+      window.print();
+    };
+    window.onafterprint = function() {
+      window.close();
+    };
+  <\/script>
+</body>
+</html>`);
+  printWin.document.close();
+}
+
 function printDoc(containerId) {
   const clone = buildDotMatrixClone(containerId);
   if (!clone) { showToast('Tidak ada dokumen. Buka Preview terlebih dahulu.'); return; }
