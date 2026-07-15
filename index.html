@@ -1462,7 +1462,7 @@ const statuses = ['Draft', 'Confirmed', 'Completed', 'Cancelled'];
 const colors = { Draft: '#6BB5E8', Confirmed: '#7C6FF7', Completed: '#5EC68A', Cancelled: '#FF7B6E' };
 
 const emptyData = () => ({
-  products: [], customers: [], pos: [], sos: [], invs: [], masuks: [], sttps: [], payments: [], profile: {}, company: {}, logo: ''
+  products: [], customers: [], pos: [], sos: [], invs: [], masuks: [], sttps: [], payments: [], profile: {}, company: {}, payment: {}, logo: ''
 });
 
 let appDataCache = emptyData();
@@ -1483,6 +1483,7 @@ async function fetchCloudData() {
       payments: JSON.parse(localStorage.getItem('payments') || '[]'),
       profile: JSON.parse(localStorage.getItem('profile') || '{}'),
       company: JSON.parse(localStorage.getItem('company') || '{}'),
+      payment: JSON.parse(localStorage.getItem('payment') || '{}'),
       logo: localStorage.getItem('logo') || ''
     };
     return;
@@ -1514,6 +1515,7 @@ async function fetchCloudData() {
         payments: JSON.parse(localStorage.getItem('payments') || '[]'),
         profile: JSON.parse(localStorage.getItem('profile') || '{}'),
         company: JSON.parse(localStorage.getItem('company') || '{}'),
+        payment: JSON.parse(localStorage.getItem('payment') || '{}'),
         logo: localStorage.getItem('logo') || ''
       };
       appDataCache = legacy;
@@ -1533,6 +1535,7 @@ async function fetchCloudData() {
       payments: JSON.parse(localStorage.getItem('payments') || '[]'),
       profile: JSON.parse(localStorage.getItem('profile') || '{}'),
       company: JSON.parse(localStorage.getItem('company') || '{}'),
+      payment: JSON.parse(localStorage.getItem('payment') || '{}'),
       logo: localStorage.getItem('logo') || ''
     };
     cloudReady = false;
@@ -1648,6 +1651,7 @@ function persistData(data) {
     localStorage.setItem('payments', JSON.stringify(data.payments || []));
     localStorage.setItem('profile', JSON.stringify(data.profile));
     localStorage.setItem('company', JSON.stringify(data.company));
+    localStorage.setItem('payment', JSON.stringify(data.payment || {}));
     if (data.logo) localStorage.setItem('logo', data.logo);
   } catch (e) { /* ignore quota errors */ }
 
