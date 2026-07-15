@@ -4314,40 +4314,40 @@ function generatePDFPreview(type) {
   // Field kolom kiri: Tanggal / No. PO / No. SJ / No. Invoice — berjenjang sesuai referensi dokumen
   let fieldRows = '';
   if (isPO) {
-    fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
-    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
-    if (doc.deliveryDate) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tgl Kirim</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.deliveryDate)}</strong></td></tr>`;
+    fieldRows = `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
+    fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
+    if (doc.deliveryDate) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tgl Kirim</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.deliveryDate)}</strong></td></tr>`;
   } else if (isSJ) {
-    fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDateIndo(doc.date)}</strong></td></tr>`;
-    if (doc.poNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.poNo}</strong></td></tr>`;
-    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
+    fieldRows = `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDateIndo(doc.date)}</strong></td></tr>`;
+    if (doc.poNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.poNo}</strong></td></tr>`;
+    fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
   } else if (isInv) {
-    fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
+    fieldRows = `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
     const soRecord = doc.soNo ? data.sos.find(s => s.no === doc.soNo) : null;
     const refPoNo = soRecord?.poNo || doc.poNo || null;
-    if (refPoNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${refPoNo}</strong></td></tr>`;
-    if (doc.soNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.soNo}</strong></td></tr>`;
-    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. Invoice</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
-    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Term Payment</td><td style="padding:2px 0;font-size:12px">: <strong>7 Hari</strong></td></tr>`;
+    if (refPoNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${refPoNo}</strong></td></tr>`;
+    if (doc.soNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.soNo}</strong></td></tr>`;
+    fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. Invoice</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
+    fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Term Payment</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>7 Hari</strong></td></tr>`;
   }
 
   // Terbilang + Subtotal/Diskon/Total Order
   let summaryHtml;
   if (isSJ) {
     // Surat Jalan: Terbilang teks polos (kiri) + kotak Subtotal/Diskon/Total Order bordered terpisah (kanan)
-    // Pakai layout tabel (bukan flex) supaya lebar kolom stabil dan teks tidak pecah per-kata saat dirender ke PDF
+    // Layout tabel auto (bukan flex/percentage) + border:none eksplisit supaya rata & bersih tanpa garis nyasar
     summaryHtml = `
-      <table style="width:100%;border-collapse:collapse;margin-top:16px;table-layout:fixed">
+      <table style="width:100%;border-collapse:collapse;margin-top:16px">
         <tr>
-          <td style="vertical-align:top;padding:0 20px 0 0;width:60%">
-            <table style="border-collapse:collapse;width:100%">
+          <td style="border:none;vertical-align:top;padding:0">
+            <table style="border-collapse:collapse">
               <tr>
-                <td style="white-space:nowrap;vertical-align:top;padding:0 10px 0 0;font-size:12px;width:1%">Terbilang</td>
-                <td style="vertical-align:top;font-size:12px">${terbilang(grandTotal)}</td>
+                <td style="border:none;white-space:nowrap;vertical-align:top;padding:0 10px 0 0;font-size:12px">Terbilang</td>
+                <td style="border:none;vertical-align:top;padding:0;font-size:12px">${terbilang(grandTotal)}</td>
               </tr>
             </table>
           </td>
-          <td style="vertical-align:top;padding:0;width:40%">
+          <td style="border:none;vertical-align:top;padding:0;width:230px">
             <table style="border-collapse:collapse;border:${BORDER};width:100%">
               <tr>
                 <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
@@ -4408,9 +4408,9 @@ function generatePDFPreview(type) {
         <div style="padding:8px 10px;border:${BORDER};max-width:240px">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Payment</div>
           <table style="border-collapse:collapse;font-size:10px">
-            <tr><td style="padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Nama Bank</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${bankName}</td></tr>
-            <tr><td style="padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">No Rekening</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${accountNumber}</td></tr>
-            <tr><td style="padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Atas Nama</td><td style="padding:1px 0;font-weight:600;font-size:10px">: ${accountHolder}</td></tr>
+            <tr><td style="border:none;padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Nama Bank</td><td style="border:none;padding:1px 0;font-weight:600;font-size:10px">: ${bankName}</td></tr>
+            <tr><td style="border:none;padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">No Rekening</td><td style="border:none;padding:1px 0;font-weight:600;font-size:10px">: ${accountNumber}</td></tr>
+            <tr><td style="border:none;padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Atas Nama</td><td style="border:none;padding:1px 0;font-weight:600;font-size:10px">: ${accountHolder}</td></tr>
           </table>
         </div>
       </div>
@@ -4446,7 +4446,7 @@ function generatePDFPreview(type) {
           ${profile.phone ? `<div style="font-size:11px;word-break:break-word;overflow-wrap:break-word">Telp: ${profile.phone}</div>` : ''}
           ${fieldRows ? `<table style="border-collapse:collapse;margin-top:14px">${fieldRows}</table>` : ''}
         </div>
-        <div style="min-width:0;flex:1 1 50%">
+        <div style="min-width:0;flex:1 1 50%;text-align:right">
           <h1 style="color:#000;font-size:26px;font-weight:800;margin:0 0 10px">${typeLabels[type]}</h1>
           <div style="font-size:12px">${partyLabel}</div>
           <strong style="font-size:14px;text-decoration:underline;display:block;margin-top:2px">${partyName}</strong>
@@ -4460,12 +4460,12 @@ function generatePDFPreview(type) {
       <table style="width:100%;border-collapse:collapse;margin:0 0 0;border:${BORDER}">
         <thead>
           <tr>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px">No. Barang</th>
-            <th style="border:${BORDER};text-align:left;padding:7px 8px;font-size:11px">Nama Barang</th>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px">Qty</th>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:80px">Satuan</th>
-            <th style="border:${BORDER};text-align:right;padding:7px 8px;font-size:11px;width:90px">Harga</th>
-            <th style="border:${BORDER};text-align:right;padding:7px 8px;font-size:11px;width:100px">Total Harga</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">No. Barang</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Nama Barang</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Qty</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:80px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Satuan</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:90px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Harga</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:100px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Total Harga</th>
           </tr>
         </thead>
         <tbody>${itemRows}</tbody>
