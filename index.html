@@ -4365,9 +4365,10 @@ function generatePDFPreview(type) {
     </tr>`;
   }).join('');
 
-  // Surat Jalan (SJ): cukup tambah 1 baris kosong ekstra di akhir (bukan dipaksa sampai 19 baris)
+  // Surat Jalan (SJ): kalau cuma 1 item, boleh lebihin 1 baris kosong. Kalau item
+  // lebih dari 1, tabel pas sesuai jumlah item aja (gak ada baris kosong tambahan).
   if (isSJ) {
-    const blankCount = 1;
+    const blankCount = doc.items.length <= 1 ? 1 : 0;
     for (let i = 0; i < blankCount; i++) {
       itemRows += `<tr>
         <td style="border:${BORDER};padding:6px 8px;height:24px">&nbsp;</td>
