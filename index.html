@@ -901,6 +901,12 @@
         <label>Stock Awal</label>
         <input type="number" id="product-stock" min="0" value="0">
       </div>
+      <div class="form-group full">
+        <label>Harga Khusus per Outlet (opsional)</label>
+        <div id="productOutletPrices"></div>
+        <button type="button" class="btn btn-outline" style="margin-top:6px" onclick="addOutletPriceRow()">+ Tambah Harga Outlet</button>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Kalau outlet gak ada di daftar ini, harga di SJ/Invoice otomatis pakai Harga Jual di atas.</div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('productModal')">Batal</button>
@@ -2068,7 +2074,50 @@ function openProductModal() {
   document.getElementById('product-profit').value = '';
   document.getElementById('product-margin').value = '';
   document.getElementById('product-stock').value = 0;
+  document.getElementById('productOutletPrices').innerHTML = '';
   document.getElementById('productModal').classList.add('open');
+}
+
+// ===== HARGA KHUSUS PER OUTLET =====
+// Tiap produk bisa punya harga jual khusus untuk outlet tertentu (product.outletPrices,
+// berupa { [customerId]: harga }). Kalau outlet suatu transaksi gak ada di daftar ini,
+// otomatis fallback ke Harga Jual default produk (lihat getOutletPrice()).
+function addOutletPriceRow(outletId, price) {
+  const data = loadData();
+  const container = document.getElementById('productOutletPrices');
+  const outlets = data.customers.filter(c => c.type === 'outlet');
+  const row = document.createElement('div');
+  row.className = 'outlet-price-row';
+  row.style = 'display:flex;gap:8px;margin-bottom:6px;align-items:center';
+  row.innerHTML = `
+    <select name="outletPriceOutlet" style="flex:1.5">
+      <option value="">-- Pilih Outlet --</option>
+      ${outlets.map(o => `<option value="${o.id}" ${outletId != null && o.id == outletId ? 'selected' : ''}>${o.name}</option>`).join('')}
+    </select>
+    <input type="number" name="outletPriceValue" min="0" placeholder="Harga khusus" value="${price != null ? price : ''}" style="flex:1">
+    <button type="button" class="remove-btn" onclick="this.closest('.outlet-price-row').remove()">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function collectOutletPrices() {
+  const rows = document.querySelectorAll('#productOutletPrices .outlet-price-row');
+  const result = {};
+  rows.forEach(row => {
+    const outletId = row.querySelector('[name="outletPriceOutlet"]').value;
+    const price = parseFloat(row.querySelector('[name="outletPriceValue"]').value);
+    if (outletId && !isNaN(price)) result[outletId] = price;
+  });
+  return result;
+}
+
+// Dipakai pas milih item di form SJ/Invoice: kalau outlet transaksi ini punya
+// harga khusus buat produk tsb, pakai itu; kalau nggak, pakai Harga Jual default.
+function getOutletPrice(product, outletId) {
+  if (outletId && product && product.outletPrices && product.outletPrices[outletId] != null) {
+    return product.outletPrices[outletId];
+  }
+  return (product && product.sellPrice) || 0;
 }
 
 function handleProductImageUpload(event) {
@@ -2112,6 +2161,8 @@ function editProduct(id) {
   document.getElementById('product-price').value = p.price || 0;
   document.getElementById('product-sell-price').value = p.sellPrice || 0;
   document.getElementById('product-stock').value = p.stock || 0;
+  document.getElementById('productOutletPrices').innerHTML = '';
+  Object.entries(p.outletPrices || {}).forEach(([outletId, price]) => addOutletPriceRow(outletId, price));
   calcProductProfit();
   document.getElementById('productModal').classList.add('open');
 }
@@ -2136,7 +2187,8 @@ function addProduct() {
     uom: document.getElementById('product-uom').value || 'pcs',
     price: parseFloat(document.getElementById('product-price').value) || 0,
     sellPrice: parseFloat(document.getElementById('product-sell-price').value) || 0,
-    stock: parseFloat(document.getElementById('product-stock').value) || 0
+    stock: parseFloat(document.getElementById('product-stock').value) || 0,
+    outletPrices: collectOutletPrices()
   };
   
   if (!product.name) {
@@ -2172,7 +2224,8 @@ function updateProduct(id) {
     uom: document.getElementById('product-uom').value || 'pcs',
     price: parseFloat(document.getElementById('product-price').value) || 0,
     sellPrice: parseFloat(document.getElementById('product-sell-price').value) || 0,
-    stock: parseFloat(document.getElementById('product-stock').value) || 0
+    stock: parseFloat(document.getElementById('product-stock').value) || 0,
+    outletPrices: collectOutletPrices()
   };
   delete data.products[idx].image; // gambar lama (kalau ada) pindah ke dokumen terpisah lewat saveProductImage
   
@@ -2794,11 +2847,12 @@ function addPOItem(presetName, presetQty, presetPrice, presetUom) {
 
   const updatePODropdown = (query) => {
     const q = (query || '').toLowerCase();
+    const outletId = document.getElementById('po-supplier').value;
     const results = q
       ? data.products.filter(p => p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q)))
       : data.products; // tampil semua kalau kosong / baru fokus
     dropdown.innerHTML = results.map(p => `
-      <div class="dropdown-item" onclick="selectPOItem(this, '${p.name.replace(/'/g, "\\'")}', '${(p.sku||'').replace(/'/g,"\\'")}', ${p.sellPrice || 0}, '${(p.uom || 'pcs').replace(/'/g,"\\'")}')">
+      <div class="dropdown-item" onclick="selectPOItem(this, '${p.name.replace(/'/g, "\\'")}', '${(p.sku||'').replace(/'/g,"\\'")}', ${getOutletPrice(p, outletId)}, '${(p.uom || 'pcs').replace(/'/g,"\\'")}')">
         ${p.name} <small style="color: var(--text-muted);">(${p.sku || ''} - ${p.uom || 'pcs'})</small>
       </div>
     `).join('');
@@ -3149,10 +3203,11 @@ function addSOItem(presetName, presetQty, presetUom, presetPrice) {
   
   input.addEventListener('input', () => {
     const query = input.value.toLowerCase();
+    const outletId = document.getElementById('so-customer').value;
     dropdown.innerHTML = data.products
       .filter(p => p.name.toLowerCase().includes(query) || (p.sku && p.sku.toLowerCase().includes(query)))
       .map(p => `
-        <div class="dropdown-item" onclick="selectSOItem(this, '${p.name.replace(/'/g, "\\'")}', '${p.uom || 'pcs'}', ${p.sellPrice || 0})">
+        <div class="dropdown-item" onclick="selectSOItem(this, '${p.name.replace(/'/g, "\\'")}', '${p.uom || 'pcs'}', ${getOutletPrice(p, outletId)})">
           ${p.name} <small>(${p.sku || ''} - ${p.uom || 'pcs'})</small>
         </div>
       `).join('');
@@ -3510,10 +3565,11 @@ function addInvItem(presetName, presetQty, presetPrice, presetUom) {
   
   input.addEventListener('input', () => {
     const query = input.value.toLowerCase();
+    const outletId = document.getElementById('inv-customer').value;
     dropdown.innerHTML = data.products
       .filter(p => p.name.toLowerCase().includes(query) || (p.sku && p.sku.toLowerCase().includes(query)))
       .map(p => `
-        <div class="dropdown-item" onclick="selectInvItem(this, '${p.name.replace(/'/g, "\\'")}', ${p.sellPrice || 0}, '${p.uom || 'pcs'}')">
+        <div class="dropdown-item" onclick="selectInvItem(this, '${p.name.replace(/'/g, "\\'")}', ${getOutletPrice(p, outletId)}, '${p.uom || 'pcs'}')">
           ${p.name} <small>(${p.sku || ''} - ${p.uom || 'pcs'})</small>
         </div>
       `).join('');
