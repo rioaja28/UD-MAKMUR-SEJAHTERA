@@ -4335,27 +4335,36 @@ function generatePDFPreview(type) {
   let summaryHtml;
   if (isSJ) {
     // Surat Jalan: Terbilang teks polos (kiri) + kotak Subtotal/Diskon/Total Order bordered terpisah (kanan)
+    // Pakai layout tabel (bukan flex) supaya lebar kolom stabil dan teks tidak pecah per-kata saat dirender ke PDF
     summaryHtml = `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:16px;gap:20px">
-        <div style="font-size:12px;flex:1 1 55%;display:flex;gap:10px">
-          <div style="white-space:nowrap">Terbilang</div>
-          <div>${terbilang(grandTotal)}</div>
-        </div>
-        <table style="border-collapse:collapse;border:${BORDER};min-width:220px;flex:0 0 auto">
-          <tr>
-            <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
-            <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${total.toLocaleString('id-ID')}</td>
-          </tr>
-          <tr>
-            <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
-            <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
-          </tr>
-          <tr>
-            <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
-            <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
-          </tr>
-        </table>
-      </div>
+      <table style="width:100%;border-collapse:collapse;margin-top:16px;table-layout:fixed">
+        <tr>
+          <td style="vertical-align:top;padding:0 20px 0 0;width:60%">
+            <table style="border-collapse:collapse;width:100%">
+              <tr>
+                <td style="white-space:nowrap;vertical-align:top;padding:0 10px 0 0;font-size:12px;width:1%">Terbilang</td>
+                <td style="vertical-align:top;font-size:12px">${terbilang(grandTotal)}</td>
+              </tr>
+            </table>
+          </td>
+          <td style="vertical-align:top;padding:0;width:40%">
+            <table style="border-collapse:collapse;border:${BORDER};width:100%">
+              <tr>
+                <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
+                <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${total.toLocaleString('id-ID')}</td>
+              </tr>
+              <tr>
+                <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
+                <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
+              </tr>
+              <tr>
+                <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
+                <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
     `;
   } else {
     // PO / Invoice: satu tabel bordered nyambung di bawah tabel item
