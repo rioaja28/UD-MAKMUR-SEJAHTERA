@@ -4365,10 +4365,9 @@ function generatePDFPreview(type) {
     </tr>`;
   }).join('');
 
-  // Surat Jalan (SJ): tambahkan baris kosong ala form cetak sampai jumlah baris minimum tercapai
+  // Surat Jalan (SJ): cukup tambah 1 baris kosong ekstra di akhir (bukan dipaksa sampai 19 baris)
   if (isSJ) {
-    const MIN_SJ_ROWS = 19;
-    const blankCount = Math.max(0, MIN_SJ_ROWS - doc.items.length);
+    const blankCount = 1;
     for (let i = 0; i < blankCount; i++) {
       itemRows += `<tr>
         <td style="border:${BORDER};padding:6px 8px;height:24px">&nbsp;</td>
