@@ -4312,12 +4312,15 @@ function generatePDFPreview(type) {
   }
 
   // Field kolom kiri: Tanggal / No. PO / No. SJ / No. Invoice — berjenjang sesuai referensi dokumen
-  // (Surat Jalan tidak memakai field kolom kiri ini — tanggal ditampilkan di kolom kanan sesuai format cetak)
   let fieldRows = '';
   if (isPO) {
     fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
     fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
     if (doc.deliveryDate) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tgl Kirim</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.deliveryDate)}</strong></td></tr>`;
+  } else if (isSJ) {
+    fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDateIndo(doc.date)}</strong></td></tr>`;
+    if (doc.poNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.poNo}</strong></td></tr>`;
+    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
   } else if (isInv) {
     fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
     const soRecord = doc.soNo ? data.sos.find(s => s.no === doc.soNo) : null;
@@ -4376,15 +4379,15 @@ function generatePDFPreview(type) {
     `;
   }
 
-  // Catatan — kotak bordered, label underline (Surat Jalan tidak menampilkan Catatan, sesuai format cetak)
-  const catatanHtml = isSJ ? '' : `
+  // Catatan — kotak bordered, label underline, untuk semua jenis dokumen
+  const catatanHtml = `
     <div style="margin-top:20px;border:${BORDER};padding:10px 14px;min-height:70px">
       <div style="font-size:12px;text-decoration:underline;margin-bottom:6px">Catatan</div>
       <div style="font-size:12px">${doc.notes || ''}</div>
     </div>
   `;
 
-  // Payment / Rekening Pembayaran
+  // Payment — khusus Invoice
   let paymentHtml = '';
   if (isInv) {
     const paymentData = data.payment || {};
@@ -4403,19 +4406,6 @@ function generatePDFPreview(type) {
         </div>
       </div>
     `;
-  } else if (isSJ) {
-    // Surat Jalan: teks polos tanpa border, sesuai format cetak
-    const paymentData = data.payment || {};
-    const bankName = paymentData.bankName || 'BCA';
-    const accountNumber = paymentData.accountNumber || '3990361532';
-    const accountHolder = paymentData.accountHolder || 'Marsella';
-    paymentHtml = `
-      <div style="margin-top:22px;font-size:12px">
-        <div style="font-weight:700;margin-bottom:4px">Rekening Pembayaran</div>
-        <div>Nomor Rekening&nbsp;&nbsp;: ${accountNumber}</div>
-        <div>Bank ${bankName} a/n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${accountHolder}</div>
-      </div>
-    `;
   }
 
   // Tanda tangan — tabel bordered 2 kolom, "Yang Menerima" & "Dibuat Oleh"
@@ -4431,11 +4421,6 @@ function generatePDFPreview(type) {
       </tr>
     </table>
   `;
-
-  // Header kanan: untuk Surat Jalan, tanggal ditampilkan di bawah alamat penerima (bukan tabel field kiri)
-  const tanggalRightHtml = isSJ
-    ? `<div style="display:flex;justify-content:space-between;margin-top:14px;font-size:12px;max-width:260px"><span>Tanggal&nbsp;:</span><span>${fmtDateIndo(doc.date)}</span></div>`
-    : '';
 
   // Kategori barang (mis. "FOOD") — hanya untuk Surat Jalan, tampil sebagai judul seksi tebal bergaris bawah di atas tabel item
   const categoryHtml = (isSJ && doc.category) ? `<div style="font-size:13px;font-weight:700;text-decoration:underline;margin-bottom:8px">${doc.category}</div>` : '';
@@ -4458,7 +4443,6 @@ function generatePDFPreview(type) {
           <strong style="font-size:14px;text-decoration:underline;display:block;margin-top:2px">${partyName}</strong>
           ${partyAddr ? `<div style="font-size:12px;margin-top:4px;white-space:pre-line">${partyAddr}</div>` : ''}
           ${partyPhone ? `<div style="font-size:12px">Telp: ${partyPhone}</div>` : ''}
-          ${tanggalRightHtml}
         </div>
       </div>
       
