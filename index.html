@@ -1042,7 +1042,7 @@
     <div class="modal-body">
       <div class="form-group full">
         <label>No Surat Jalan</label>
-        <input type="text" id="so-no" placeholder="Auto generate" readonly>
+        <input type="text" id="so-no" placeholder="Pilih outlet dulu, nomor otomatis muncul" readonly>
       </div>
       <div class="form-group full">
         <label>Referensi PO Outlet (Opsional)</label>
@@ -1050,7 +1050,7 @@
       </div>
       <div class="form-group">
         <label>Customer</label>
-        <select id="so-customer" onchange="showSelectedAddress('so-customer','so-customer-address')"></select>
+        <select id="so-customer" onchange="showSelectedAddress('so-customer','so-customer-address'); updateSONumberFromOutlet()"></select>
       </div>
       <div class="form-group">
         <label>Tanggal</label>
@@ -1799,6 +1799,43 @@ function fmtDate(dateStr) {
 
 function generateNo(prefix) {
   return prefix + '-' + Date.now().toString().slice(-6);
+}
+
+function getCustomerNameById(id) {
+  if (!id) return '';
+  const data = loadData();
+  const c = data.customers.find(c => c.id == id);
+  return c ? c.name : '';
+}
+
+// Nomor Surat Jalan otomatis: SJ-{Nama Outlet}-0001, dst.
+// Nomornya diambil dari yang PALING KECIL yang belum kepakai untuk outlet itu
+// (jadi kalau ada SJ di tengah yang kehapus, nomor kosong itu keisi lagi duluan,
+// bukan cuma nambah terus dari nomor terakhir).
+function generateSJNumber(outletName) {
+  const name = (outletName || '').trim();
+  if (!name) return '';
+  const data = loadData();
+  const prefix = `SJ-${name}-`;
+  const used = new Set();
+  (data.sos || []).forEach(so => {
+    if (so.no && so.no.startsWith(prefix)) {
+      const n = parseInt(so.no.slice(prefix.length), 10);
+      if (!isNaN(n)) used.add(n);
+    }
+  });
+  let n = 1;
+  while (used.has(n)) n++;
+  return prefix + String(n).padStart(4, '0');
+}
+
+// Dipanggil tiap kali outlet di form Surat Jalan dipilih/diganti — nomor SJ
+// otomatis ke-generate ulang sesuai outlet yang baru dipilih.
+function updateSONumberFromOutlet() {
+  const field = document.getElementById('so-no');
+  if (!field) return;
+  const outletName = getCustomerNameById(document.getElementById('so-customer').value);
+  field.value = outletName ? generateSJNumber(outletName) : '';
 }
 
 // ===== THEME (DARK MODE & ACCENT COLOR) =====
@@ -3106,6 +3143,7 @@ function loadPOIntoSO() {
 
   populateCustomerSelect('so-customer', po.supplier, 'outlet');
   showSelectedAddress('so-customer', 'so-customer-address');
+  updateSONumberFromOutlet();
 
   // Tanggal Kirim SJ ikut Tanggal Kirim dari PO referensi, biar ga harus ganti manual
   if (po.deliveryDate) {
@@ -3184,7 +3222,7 @@ function saveSO() {
   } else {
     const so = {
       id: Date.now(),
-      no: document.getElementById('so-no').value || generateNo('SJ'),
+      no: document.getElementById('so-no').value || generateSJNumber(getCustomerNameById(document.getElementById('so-customer').value)) || generateNo('SJ'),
       customer: document.getElementById('so-customer').value,
       date: document.getElementById('so-date').value,
       items: items,
@@ -3387,7 +3425,7 @@ function closeLightbox(event) {
 
 function resetSOModal() {
   editingSOId = null;
-  document.getElementById('so-no').value = generateNo('SJ');
+  document.getElementById('so-no').value = '';
   populatePORefSelect('');
   document.getElementById('so-customer').value = '';
   document.getElementById('so-date').value = today();
@@ -4185,7 +4223,7 @@ function previewSO() {
   }));
   
   const so = {
-    no: document.getElementById('so-no').value || generateNo('SJ'),
+    no: document.getElementById('so-no').value || generateSJNumber(getCustomerNameById(document.getElementById('so-customer').value)) || generateNo('SJ'),
     customer: document.getElementById('so-customer').value,
     date: document.getElementById('so-date').value,
     items: items,
@@ -4360,7 +4398,6 @@ function generatePDFPreview(type) {
     if (refPoNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${refPoNo}</strong></td></tr>`;
     if (doc.soNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.soNo}</strong></td></tr>`;
     fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. Invoice</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
-    fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Term Payment</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>7 Hari</strong></td></tr>`;
   }
 
   // Terbilang + Subtotal/Diskon/Total Order
@@ -4492,7 +4529,7 @@ function generatePDFPreview(type) {
       <table style="width:100%;border-collapse:collapse;margin:0 0 0;border:${BORDER}">
         <thead>
           <tr>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">No. Barang</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">No</th>
             <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Nama Barang</th>
             <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Qty</th>
             <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:80px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Satuan</th>
