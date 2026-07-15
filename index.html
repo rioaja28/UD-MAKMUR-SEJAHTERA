@@ -299,7 +299,7 @@
 <div class="sidebar" id="sidebar">
   <div class="logo">
     <img id="logoImg" class="logo-img" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%237C6FF7' width='100' height='100'/%3E%3Ctext x='50' y='60' font-size='40' font-weight='bold' fill='white' text-anchor='middle'%3EIJ%3C/text%3E%3C/svg%3E" alt="Logo">
-    <div>Indo Jaya<br>Bersama</div>
+    <div id="sidebarStoreName">Indo Jaya<br>Bersama</div>
   </div>
   
   <div class="nav-section">Menu Utama</div>
@@ -1733,6 +1733,33 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', flushCloudSave);
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// Update nama toko yang tampil di sidebar, judul tab browser, dan logo —
+// dipanggil tiap kali app dibuka, tiap kali Pengaturan disimpan, dan tiap
+// kali ada update realtime dari device lain (biar semua device kompak).
+function updateStoreBranding() {
+  const profile = getCompanyProfile();
+  const nameEl = document.getElementById('sidebarStoreName');
+  if (nameEl) {
+    // Kalau nama tokonya 2 kata, pecah jadi 2 baris (biar rapi kaya versi asli).
+    // Kalau bukan, tampilkan apa adanya dalam 1 baris.
+    const words = profile.name.trim().split(/\s+/);
+    if (words.length === 2) {
+      nameEl.innerHTML = escapeHtml(words[0]) + '<br>' + escapeHtml(words[1]);
+    } else {
+      nameEl.textContent = profile.name;
+    }
+  }
+  document.title = profile.name + ' ERP';
+  const logoImg = document.getElementById('logoImg');
+  if (logoImg && profile.logo) logoImg.src = profile.logo;
+}
+
 function getCompanyProfile() {
   const data = loadData();
   return {
@@ -1841,6 +1868,7 @@ function saveSettings() {
     accountHolder: document.getElementById('bankAccountHolder').value || 'KHANSA DWI AGUSTINA'
   };
   saveData(data);
+  updateStoreBranding();
   showToast('Pengaturan berhasil disimpan!');
 }
 
@@ -4732,6 +4760,7 @@ function startRealtimeSync() {
 
     const cloud = snap.data() || {};
     appDataCache = Object.assign(emptyData(), cloud);
+    updateStoreBranding();
 
     if (isAnyModalOpen()) {
       // Tunda render sampai modal ditutup, biar form yang lagi diisi ga keganggu
@@ -6211,19 +6240,62 @@ function downloadDotMatrixPDF(containerId) {
 
 // ===== INIT =====
 function showLoginScreen(onSuccess) {
+  // Nama & logo toko belum bisa diambil dari cloud (belum login), jadi pakai
+  // cadangan lokal (localStorage) dari sesi terakhir di device ini kalau ada.
+  let cachedCompany = {};
+  try { cachedCompany = JSON.parse(localStorage.getItem('company') || '{}'); } catch (e) {}
+  const storeName = cachedCompany.name || 'Nama Toko Anda';
+  const storeLogo = localStorage.getItem('logo') || '';
+  const initials = storeName.trim().split(/\s+/).map(w => w.charAt(0)).slice(0, 2).join('').toUpperCase();
+
   const overlay = document.createElement('div');
   overlay.id = 'loginOverlay';
-  overlay.style = 'position:fixed;inset:0;background:#FDF8F3;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:inherit';
   overlay.innerHTML = `
-    <div style="width:100%;max-width:340px;padding:32px 28px;background:#FFFFFF;border-radius:14px;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
-      <div style="text-align:center;margin-bottom:24px">
-        <div style="font-size:18px;font-weight:700;color:#1A1A2E">Nama Toko Anda</div>
-        <div style="font-size:13px;color:#8A8A9A;margin-top:2px">Masuk ke Clarity ERP</div>
+    <style>
+      #loginOverlay { position:fixed; inset:0; z-index:9999; font-family:inherit; display:flex; align-items:center; justify-content:center;
+        background: radial-gradient(circle at 15% 15%, var(--purple-light), transparent 45%),
+                    radial-gradient(circle at 85% 85%, var(--purple-light), transparent 45%),
+                    var(--bg);
+        overflow:auto; padding:20px; box-sizing:border-box; }
+      #loginOverlay .login-card { width:100%; max-width:380px; padding:40px 32px; background:var(--card-bg); border-radius:20px;
+        box-shadow:0 20px 60px rgba(0,0,0,0.12); border:1px solid var(--border); animation:loginPop .45s cubic-bezier(.2,.9,.3,1.2); box-sizing:border-box; }
+      @keyframes loginPop { from { opacity:0; transform:translateY(14px) scale(.97);} to { opacity:1; transform:translateY(0) scale(1);} }
+      #loginOverlay .login-logo { width:60px; height:60px; border-radius:16px; margin:0 auto 18px; display:flex; align-items:center; justify-content:center;
+        background: linear-gradient(135deg, var(--purple), #9B8FFF); color:#fff; font-size:22px; font-weight:700; box-shadow:0 8px 20px rgba(124,111,247,0.35); overflow:hidden; }
+      #loginOverlay .login-logo img { width:100%; height:100%; object-fit:cover; }
+      #loginOverlay .login-title { text-align:center; font-size:20px; font-weight:700; color:var(--text); margin-bottom:4px; }
+      #loginOverlay .login-subtitle { text-align:center; font-size:13px; color:var(--text-muted); margin-bottom:28px; }
+      #loginOverlay .login-field { position:relative; margin-bottom:14px; }
+      #loginOverlay .login-field span.icon { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:15px; opacity:.55; pointer-events:none; }
+      #loginOverlay .login-field input { width:100%; padding:12px 14px 12px 40px; border:1.5px solid var(--border); border-radius:10px; font-size:14px;
+        box-sizing:border-box; background:var(--bg); color:var(--text); outline:none; transition:border-color .15s, box-shadow .15s; }
+      #loginOverlay .login-field input:focus { border-color:var(--purple); box-shadow:0 0 0 3px var(--purple-light); }
+      #loginOverlay .login-field .toggle-eye { position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:14px; opacity:.55; user-select:none; background:none; border:none; padding:4px; }
+      #loginOverlay .login-btn { width:100%; padding:12px; margin-top:6px; background:linear-gradient(135deg, var(--purple), #6C5FE8); color:#fff; border:none;
+        border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; transition:transform .12s, box-shadow .12s; box-shadow:0 8px 18px rgba(124,111,247,0.3); }
+      #loginOverlay .login-btn:hover:not(:disabled) { transform:translateY(-1px); box-shadow:0 10px 22px rgba(124,111,247,0.4); }
+      #loginOverlay .login-btn:active:not(:disabled) { transform:translateY(0); }
+      #loginOverlay .login-btn:disabled { opacity:.7; cursor:default; }
+      #loginOverlay .login-error { color:#FF7B6E; font-size:12.5px; margin-top:12px; text-align:center; min-height:14px; }
+      #loginOverlay .login-footer { text-align:center; font-size:11.5px; color:var(--text-muted); margin-top:24px; }
+    </style>
+    <div class="login-card">
+      <div class="login-logo">${storeLogo ? `<img src="${storeLogo}" alt="Logo">` : escapeHtml(initials || 'T')}</div>
+      <div class="login-title">${escapeHtml(storeName)}</div>
+      <div class="login-subtitle">Masuk untuk melanjutkan ke Clarity ERP</div>
+
+      <div class="login-field">
+        <span class="icon">✉️</span>
+        <input id="loginEmail" type="email" placeholder="Email" autocomplete="username">
       </div>
-      <input id="loginEmail" type="email" placeholder="Email" autocomplete="username" style="width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid #E0E0E0;border-radius:8px;font-size:14px;box-sizing:border-box">
-      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" style="width:100%;padding:10px 12px;margin-bottom:14px;border:1px solid #E0E0E0;border-radius:8px;font-size:14px;box-sizing:border-box">
-      <button id="loginSubmitBtn" style="width:100%;padding:11px;background:#1E5A96;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Masuk</button>
-      <div id="loginError" style="color:#FF7B6E;font-size:12px;margin-top:10px;text-align:center;min-height:14px"></div>
+      <div class="login-field">
+        <span class="icon">🔒</span>
+        <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" style="padding-right:40px">
+        <button type="button" class="toggle-eye" id="loginTogglePass">👁️</button>
+      </div>
+      <button id="loginSubmitBtn" class="login-btn">Masuk</button>
+      <div id="loginError" class="login-error"></div>
+      <div class="login-footer">🔒 Data tersinkron aman di semua perangkat Anda</div>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -6232,6 +6304,13 @@ function showLoginScreen(onSuccess) {
   const passInput = document.getElementById('loginPassword');
   const errEl = document.getElementById('loginError');
   const btn = document.getElementById('loginSubmitBtn');
+  const toggleEye = document.getElementById('loginTogglePass');
+
+  toggleEye.addEventListener('click', () => {
+    const isPw = passInput.type === 'password';
+    passInput.type = isPw ? 'text' : 'password';
+    toggleEye.textContent = isPw ? '🙈' : '👁️';
+  });
 
   function attemptLogin() {
     const email = emailInput.value.trim();
@@ -6258,6 +6337,7 @@ function showLoginScreen(onSuccess) {
 
   btn.addEventListener('click', attemptLogin);
   passInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+  emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
 }
 
 function startApp() {
@@ -6269,6 +6349,7 @@ function startApp() {
   if (_data.logo) {
     document.getElementById('favicon').href = _data.logo;
   }
+  updateStoreBranding();
   renderDashboard();
   renderProducts();
   renderCustomers();
@@ -6332,9 +6413,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
       } else {
         loadingOverlay.remove();
-        showLoginScreen(() => {
-          document.body.appendChild(loadingOverlay);
-          afterAuthReady();
+        // Best-effort: coba ambil nama & logo toko dari cloud SEBELUM login,
+        // supaya device yang baru pertama kali buka app pun bisa lihat nama/logo
+        // toko yang benar (bukan cuma cache lokal). Kalau aturan keamanan Firestore
+        // melarang baca tanpa login, ini gagal diam-diam dan otomatis fallback ke
+        // cache lokal / nama default — tidak akan bikin app error atau macet.
+        cloudDocRef.get().then(snap => {
+          if (snap.exists) {
+            const cloud = snap.data() || {};
+            if (cloud.company) localStorage.setItem('company', JSON.stringify(cloud.company));
+            if (cloud.logo) localStorage.setItem('logo', cloud.logo);
+          }
+        }).catch(() => {}).finally(() => {
+          showLoginScreen(() => {
+            document.body.appendChild(loadingOverlay);
+            afterAuthReady();
+          });
         });
       }
     });
