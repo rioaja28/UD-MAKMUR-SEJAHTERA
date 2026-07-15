@@ -564,7 +564,7 @@
     <!-- CUSTOMERS PAGE -->
     <div id="customers" class="page">
       <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-        <button class="btn btn-primary" onclick="document.getElementById('customerModal').classList.add('open')">+ Tambah Supplier/Outlet</button>
+        <button class="btn btn-primary" onclick="resetCustomerModal(); document.getElementById('customerModal').classList.add('open')">+ Tambah Supplier/Outlet</button>
         <button class="btn btn-outline" onclick="openImportModal('customers')">📥 Import Excel</button>
         <button class="btn btn-success" onclick="exportTableToExcel('customers')">📤 Export Excel</button>
       </div>
@@ -1266,10 +1266,11 @@
 <div class="modal-overlay" id="customerModal">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Tambah Supplier/Outlet</div>
+      <div class="modal-title" id="customerModalTitle">Tambah Supplier/Outlet</div>
       <button class="modal-close" onclick="closeModal('customerModal')">×</button>
     </div>
     <div class="modal-body">
+      <input type="hidden" id="customer-edit-id" value="">
       <div class="form-group">
         <label>Tipe</label>
         <select id="customer-type">
@@ -1289,10 +1290,14 @@
         <label>Alamat</label>
         <textarea id="customer-address" style="min-height: 60px;"></textarea>
       </div>
+      <div class="form-group full" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="customer-show-rekening" style="width:auto">
+        <label style="margin:0" for="customer-show-rekening">Tampilkan Rekening Pembayaran di Surat Jalan (khusus Outlet)</label>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('customerModal')">Batal</button>
-      <button class="btn btn-primary" onclick="addCustomer()">Simpan</button>
+      <button class="btn btn-primary" id="customerSaveBtn" onclick="saveCustomerModal()">Simpan</button>
     </div>
   </div>
 </div>
@@ -2357,6 +2362,26 @@ function deleteProduct(id) {
 }
 
 // ===== CUSTOMER MANAGEMENT =====
+function saveCustomerModal() {
+  const editId = document.getElementById('customer-edit-id').value;
+  if (editId) {
+    updateCustomer(parseInt(editId));
+  } else {
+    addCustomer();
+  }
+}
+
+function resetCustomerModal() {
+  document.getElementById('customer-edit-id').value = '';
+  document.getElementById('customerModalTitle').textContent = 'Tambah Supplier/Outlet';
+  document.getElementById('customerSaveBtn').textContent = 'Simpan';
+  document.getElementById('customer-type').value = 'supplier';
+  document.getElementById('customer-name').value = '';
+  document.getElementById('customer-phone').value = '';
+  document.getElementById('customer-address').value = '';
+  document.getElementById('customer-show-rekening').checked = false;
+}
+
 function addCustomer() {
   const data = loadData();
   const customer = {
@@ -2364,7 +2389,8 @@ function addCustomer() {
     type: document.getElementById('customer-type').value,
     name: document.getElementById('customer-name').value,
     phone: document.getElementById('customer-phone').value,
-    address: document.getElementById('customer-address').value
+    address: document.getElementById('customer-address').value,
+    showRekeningSJ: document.getElementById('customer-show-rekening').checked
   };
   
   if (!customer.name) {
@@ -2380,10 +2406,51 @@ function addCustomer() {
   populateCustomerSelect('so-customer', '', 'outlet');
   populateCustomerSelect('inv-customer', '', 'outlet');
   populateCustomerSelect('masuk-supplier', '', 'supplier');
-  document.getElementById('customer-name').value = '';
-  document.getElementById('customer-phone').value = '';
-  document.getElementById('customer-address').value = '';
+  resetCustomerModal();
   showToast('Data berhasil disimpan!');
+}
+
+function editCustomer(id) {
+  const data = loadData();
+  const c = data.customers.find(c => c.id === id);
+  if (!c) return;
+  document.getElementById('customer-edit-id').value = c.id;
+  document.getElementById('customerModalTitle').textContent = 'Edit Supplier/Outlet';
+  document.getElementById('customerSaveBtn').textContent = 'Update';
+  document.getElementById('customer-type').value = c.type || 'supplier';
+  document.getElementById('customer-name').value = c.name || '';
+  document.getElementById('customer-phone').value = c.phone || '';
+  document.getElementById('customer-address').value = c.address || '';
+  document.getElementById('customer-show-rekening').checked = !!c.showRekeningSJ;
+  document.getElementById('customerModal').classList.add('open');
+}
+
+function updateCustomer(id) {
+  const data = loadData();
+  const idx = data.customers.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  const name = document.getElementById('customer-name').value;
+  if (!name) {
+    alert('Nama tidak boleh kosong');
+    return;
+  }
+  data.customers[idx] = {
+    ...data.customers[idx],
+    type: document.getElementById('customer-type').value,
+    name,
+    phone: document.getElementById('customer-phone').value,
+    address: document.getElementById('customer-address').value,
+    showRekeningSJ: document.getElementById('customer-show-rekening').checked
+  };
+  saveData(data);
+  closeModal('customerModal');
+  renderCustomers();
+  populateCustomerSelect('po-supplier', '', 'outlet');
+  populateCustomerSelect('so-customer', '', 'outlet');
+  populateCustomerSelect('inv-customer', '', 'outlet');
+  populateCustomerSelect('masuk-supplier', '', 'supplier');
+  resetCustomerModal();
+  showToast('Data berhasil diupdate!');
 }
 
 function renderCustomers() {
@@ -2396,6 +2463,7 @@ function renderCustomers() {
       <td>${c.phone}</td>
       <td>${c.address}</td>
       <td class="action-btns">
+        <button class="btn btn-sm btn-outline" onclick="editCustomer(${c.id})">Edit</button>
         <button class="btn btn-sm btn-outline" onclick="deleteCustomer(${c.id})">Hapus</button>
       </td>
     </tr>
@@ -4433,16 +4501,18 @@ function generatePDFPreview(type) {
   const isInv = type === 'inv';
   const isPO = type === 'po';
   
-  let partyLabel, partyName, partyAddr, partyPhone;
+  let partyLabel, partyName, partyAddr, partyPhone, partyRecord;
   if (isPO) {
     partyLabel = 'Outlet';
     const supplier = data.customers.find(c => c.id == doc.supplier);
+    partyRecord = supplier;
     partyName = supplier?.name || 'Unknown';
     partyAddr = supplier?.address || '';
     partyPhone = supplier?.phone || '';
   } else {
     partyLabel = isSJ ? 'Dikirim ke' : 'Kepada Yth';
     const customer = data.customers.find(c => c.id == doc.customer);
+    partyRecord = customer;
     partyName = customer?.name || 'Unknown';
     partyAddr = customer?.address || '';
     partyPhone = customer?.phone || '';
@@ -4486,9 +4556,9 @@ function generatePDFPreview(type) {
   // Field kolom kiri: Tanggal / No. PO / No. SJ / No. Invoice — berjenjang sesuai referensi dokumen
   let fieldRows = '';
   if (isPO) {
-    fieldRows = `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
+    fieldRows = `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDateIndo(doc.date)}</strong></td></tr>`;
     fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
-    if (doc.deliveryDate) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tgl Kirim</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.deliveryDate)}</strong></td></tr>`;
+    if (doc.deliveryDate) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tgl Kirim</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDateIndo(doc.deliveryDate)}</strong></td></tr>`;
   } else if (isSJ) {
     fieldRows = `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDateIndo(doc.date)}</strong></td></tr>`;
     if (doc.poNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.poNo}</strong></td></tr>`;
@@ -4502,62 +4572,38 @@ function generatePDFPreview(type) {
     fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. Invoice</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
   }
 
-  // Terbilang + Subtotal/Diskon/Total Order
-  let summaryHtml;
-  if (isSJ || isInv) {
-    // Surat Jalan & Invoice: Terbilang teks polos (kiri) + kotak Subtotal/Diskon/Total Order bordered terpisah (kanan)
-    // Layout tabel auto (bukan flex/percentage) + border:none eksplisit supaya rata & bersih tanpa garis nyasar
-    summaryHtml = `
-      <table style="width:100%;border-collapse:collapse;margin-top:16px">
-        <tr>
-          <td style="border:none;vertical-align:top;padding:0">
-            <table style="border-collapse:collapse">
-              <tr>
-                <td style="border:none;white-space:nowrap;vertical-align:top;padding:0 10px 0 0;font-size:12px">Terbilang</td>
-                <td style="border:none;vertical-align:top;padding:0;font-size:12px">${terbilang(grandTotal)}</td>
-              </tr>
-            </table>
-          </td>
-          <td style="border:none;vertical-align:top;padding:0;width:230px">
-            <table style="border-collapse:collapse;border:${BORDER};width:100%">
-              <tr>
-                <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
-                <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${total.toLocaleString('id-ID')}</td>
-              </tr>
-              <tr>
-                <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
-                <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
-              </tr>
-              <tr>
-                <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
-                <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    `;
-  } else {
-    // PO: satu tabel bordered nyambung di bawah tabel item
-    summaryHtml = `
-      <table style="width:100%;border-collapse:collapse;border:${BORDER};border-top:none">
-        <tr>
-          <td style="border:${BORDER};padding:8px;width:100px;vertical-align:top;font-size:12px">Terbilang</td>
-          <td style="border:${BORDER};padding:8px;vertical-align:top;font-size:12px" rowspan="3">${terbilang(grandTotal)}</td>
-          <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
-          <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px;width:120px">${total.toLocaleString('id-ID')}</td>
-        </tr>
-        <tr>
-          <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
-          <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
-        </tr>
-        <tr>
-          <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
-          <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
-        </tr>
-      </table>
-    `;
-  }
+  // Terbilang + Subtotal/Diskon/Total Order — sama untuk PO, SJ, dan Invoice:
+  // Terbilang teks polos (kiri) + kotak Subtotal/Diskon/Total Order bordered terpisah (kanan)
+  const summaryHtml = `
+    <table style="width:100%;border-collapse:collapse;margin-top:16px">
+      <tr>
+        <td style="border:none;vertical-align:top;padding:0">
+          <table style="border-collapse:collapse">
+            <tr>
+              <td style="border:none;white-space:nowrap;vertical-align:top;padding:0 10px 0 0;font-size:12px">Terbilang</td>
+              <td style="border:none;vertical-align:top;padding:0;font-size:12px">${terbilang(grandTotal)}</td>
+            </tr>
+          </table>
+        </td>
+        <td style="border:none;vertical-align:top;padding:0;width:230px">
+          <table style="border-collapse:collapse;border:${BORDER};width:100%">
+            <tr>
+              <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
+              <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${total.toLocaleString('id-ID')}</td>
+            </tr>
+            <tr>
+              <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
+              <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
+            </tr>
+            <tr>
+              <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
+              <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `;
 
   // Catatan — kotak bordered, label underline. Khusus Invoice, kotak ini dihilangkan.
   const catatanHtml = isInv ? '' : `
@@ -4567,9 +4613,11 @@ function generatePDFPreview(type) {
     </div>
   `;
 
-  // Rekening Pembayaran — khusus Invoice, tanpa kotak/border
+  // Rekening Pembayaran — selalu tampil di Invoice; di Surat Jalan cuma tampil
+  // kalau outlet-nya diset "Tampilkan Rekening di SJ" (lihat form Edit Outlet)
   let paymentHtml = '';
-  if (isInv) {
+  const showPayment = isInv || (isSJ && partyRecord && partyRecord.showRekeningSJ);
+  if (showPayment) {
     const paymentData = data.payment || {};
     const bankName = paymentData.bankName || 'BCA';
     const accountNumber = paymentData.accountNumber || '108-298-2153';
@@ -4609,7 +4657,7 @@ function generatePDFPreview(type) {
   pdfContent.innerHTML = `
     <div class="pdf-content">
       <!-- HEADER: Logo + Nama Perusahaan + field dokumen (kiri) | Judul + Dikirim ke (kanan) -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;${(isSJ || isInv) ? 'padding-bottom:0' : 'padding-bottom:14px;border-bottom:2px solid #000'};gap:20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:0;gap:20px">
         <div style="min-width:0;flex:1 1 50%">
           ${logo ? `<img src="${logo}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px">` : `<div style="font-size:26px;font-weight:800;margin-bottom:4px">${initials}</div>`}
           <div style="font-size:13px;font-weight:700;word-break:break-word;overflow-wrap:break-word">${profile.name}</div>
