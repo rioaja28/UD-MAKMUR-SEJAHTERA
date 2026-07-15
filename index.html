@@ -1064,6 +1064,10 @@
           <option value="Selesai">Selesai</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>Kategori Barang (Opsional)</label>
+        <input type="text" id="so-category" placeholder="cth: FOOD">
+      </div>
 
       <div class="items-section">
         <table class="items-table">
@@ -3103,6 +3107,7 @@ function editSO(id) {
   document.getElementById('so-date').value = so.date;
   document.getElementById('so-driver').value = so.driver || '';
   document.getElementById('so-status').value = so.status || 'Dikirim';
+  document.getElementById('so-category').value = so.category || '';
   showSelectedAddress('so-customer', 'so-customer-address');
   document.getElementById('so-items').innerHTML = '';
   so.items.forEach(item => addSOItem(item.name, item.qty, item.uom, item.price));
@@ -3140,6 +3145,7 @@ function saveSO() {
     so.items = items;
     so.driver = document.getElementById('so-driver').value;
     so.status = document.getElementById('so-status').value;
+    so.category = document.getElementById('so-category').value || '';
     so.poId = poRefId;
     so.poNo = poRef ? poRef.no : (so.poNo || null);
     showToast('Surat Jalan berhasil direvisi!');
@@ -3152,6 +3158,7 @@ function saveSO() {
       items: items,
       driver: document.getElementById('so-driver').value,
       status: document.getElementById('so-status').value || 'Dikirim',
+      category: document.getElementById('so-category').value || '',
       poId: poRefId,
       poNo: poRef ? poRef.no : null
     };
@@ -3353,6 +3360,7 @@ function resetSOModal() {
   document.getElementById('so-customer').value = '';
   document.getElementById('so-date').value = today();
   document.getElementById('so-status').value = 'Dikirim';
+  document.getElementById('so-category').value = '';
   document.getElementById('so-items').innerHTML = '';
   document.getElementById('so-driver').value = '';
   document.getElementById('so-total').textContent = '0';
@@ -4150,7 +4158,8 @@ function previewSO() {
     date: document.getElementById('so-date').value,
     items: items,
     driver: document.getElementById('so-driver').value,
-    status: document.getElementById('so-status').value || 'Dikirim'
+    status: document.getElementById('so-status').value || 'Dikirim',
+    category: document.getElementById('so-category').value || ''
   };
   
   pdfDocData = { type: 'so', doc: so };
@@ -4218,6 +4227,14 @@ function terbilang(n) {
 // Nama bulan Indonesia (dipakai untuk format nama file download)
 const BULAN_INDO = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI','JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'];
 
+// Format tanggal panjang ala dokumen cetak: "15 Juli 2026"
+function fmtDateIndo(dateStr) {
+  const dt = parseLocalDate(dateStr);
+  const bulan = BULAN_INDO[dt.getMonth()];
+  const bulanCap = bulan.charAt(0) + bulan.slice(1).toLowerCase();
+  return `${dt.getDate()} ${bulanCap} ${dt.getFullYear()}`;
+}
+
 // Format nama file: YYYYMMDD_TIPE_NAMAOUTLET_D_BULAN_YY
 // Contoh: 20260714_SJ_KINKO_14_JULI_26
 function buildDocFileName(type, doc, partyName) {
@@ -4278,15 +4295,31 @@ function generatePDFPreview(type) {
     </tr>`;
   }).join('');
 
+  // Surat Jalan (SJ): tambahkan baris kosong ala form cetak sampai jumlah baris minimum tercapai
+  if (isSJ) {
+    const MIN_SJ_ROWS = 19;
+    const blankCount = Math.max(0, MIN_SJ_ROWS - doc.items.length);
+    for (let i = 0; i < blankCount; i++) {
+      itemRows += `<tr>
+        <td style="border:${BORDER};padding:6px 8px;height:24px">&nbsp;</td>
+        <td style="border:${BORDER};padding:6px 8px">&nbsp;</td>
+        <td style="border:${BORDER};padding:6px 8px">&nbsp;</td>
+        <td style="border:${BORDER};padding:6px 8px">&nbsp;</td>
+        <td style="border:${BORDER};padding:6px 8px">&nbsp;</td>
+        <td style="border:${BORDER};padding:6px 8px">&nbsp;</td>
+      </tr>`;
+    }
+  }
+
   // Field kolom kiri: Tanggal / No. PO / No. SJ / No. Invoice — berjenjang sesuai referensi dokumen
-  let fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
+  // (Surat Jalan tidak memakai field kolom kiri ini — tanggal ditampilkan di kolom kanan sesuai format cetak)
+  let fieldRows = '';
   if (isPO) {
+    fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
     fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
     if (doc.deliveryDate) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tgl Kirim</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.deliveryDate)}</strong></td></tr>`;
-  } else if (isSJ) {
-    if (doc.poNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.poNo}</strong></td></tr>`;
-    fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
   } else if (isInv) {
+    fieldRows = `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
     const soRecord = doc.soNo ? data.sos.find(s => s.no === doc.soNo) : null;
     const refPoNo = soRecord?.poNo || doc.poNo || null;
     if (refPoNo) fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="padding:2px 0;font-size:12px">: <strong>${refPoNo}</strong></td></tr>`;
@@ -4295,35 +4328,63 @@ function generatePDFPreview(type) {
     fieldRows += `<tr><td style="padding:2px 10px 2px 0;font-size:12px">Term Payment</td><td style="padding:2px 0;font-size:12px">: <strong>7 Hari</strong></td></tr>`;
   }
 
-  // Terbilang + Subtotal/Diskon/Total Order — satu tabel bordered nyambung di bawah tabel item (semua jenis dokumen)
-  const summaryHtml = `
-    <table style="width:100%;border-collapse:collapse;border:${BORDER};border-top:none">
-      <tr>
-        <td style="border:${BORDER};padding:8px;width:100px;vertical-align:top;font-size:12px">Terbilang</td>
-        <td style="border:${BORDER};padding:8px;vertical-align:top;font-size:12px" rowspan="3">${terbilang(grandTotal)}</td>
-        <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
-        <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px;width:120px">${total.toLocaleString('id-ID')}</td>
-      </tr>
-      <tr>
-        <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
-        <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
-      </tr>
-      <tr>
-        <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
-        <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
-      </tr>
-    </table>
-  `;
+  // Terbilang + Subtotal/Diskon/Total Order
+  let summaryHtml;
+  if (isSJ) {
+    // Surat Jalan: Terbilang teks polos (kiri) + kotak Subtotal/Diskon/Total Order bordered terpisah (kanan)
+    summaryHtml = `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:16px;gap:20px">
+        <div style="font-size:12px;flex:1 1 55%;display:flex;gap:10px">
+          <div style="white-space:nowrap">Terbilang</div>
+          <div>${terbilang(grandTotal)}</div>
+        </div>
+        <table style="border-collapse:collapse;border:${BORDER};min-width:220px;flex:0 0 auto">
+          <tr>
+            <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
+            <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${total.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
+            <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
+          </tr>
+          <tr>
+            <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
+            <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
+          </tr>
+        </table>
+      </div>
+    `;
+  } else {
+    // PO / Invoice: satu tabel bordered nyambung di bawah tabel item
+    summaryHtml = `
+      <table style="width:100%;border-collapse:collapse;border:${BORDER};border-top:none">
+        <tr>
+          <td style="border:${BORDER};padding:8px;width:100px;vertical-align:top;font-size:12px">Terbilang</td>
+          <td style="border:${BORDER};padding:8px;vertical-align:top;font-size:12px" rowspan="3">${terbilang(grandTotal)}</td>
+          <td style="border:${BORDER};padding:5px 10px;font-size:12px">Subtotal</td>
+          <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px;width:120px">${total.toLocaleString('id-ID')}</td>
+        </tr>
+        <tr>
+          <td style="border:${BORDER};padding:5px 10px;font-size:12px">Diskon</td>
+          <td style="border:${BORDER};padding:5px 10px;text-align:right;font-size:12px">${discount.toLocaleString('id-ID')}</td>
+        </tr>
+        <tr>
+          <td style="border:${BORDER};padding:5px 10px;font-weight:700;font-size:12px">Total Order</td>
+          <td style="border:${BORDER};padding:5px 10px;text-align:right;font-weight:700;font-size:12px">${grandTotal.toLocaleString('id-ID')}</td>
+        </tr>
+      </table>
+    `;
+  }
 
-  // Catatan — kotak bordered, label underline, untuk semua jenis dokumen
-  const catatanHtml = `
+  // Catatan — kotak bordered, label underline (Surat Jalan tidak menampilkan Catatan, sesuai format cetak)
+  const catatanHtml = isSJ ? '' : `
     <div style="margin-top:20px;border:${BORDER};padding:10px 14px;min-height:70px">
       <div style="font-size:12px;text-decoration:underline;margin-bottom:6px">Catatan</div>
       <div style="font-size:12px">${doc.notes || ''}</div>
     </div>
   `;
 
-  // Payment — khusus Invoice
+  // Payment / Rekening Pembayaran
   let paymentHtml = '';
   if (isInv) {
     const paymentData = data.payment || {};
@@ -4342,6 +4403,19 @@ function generatePDFPreview(type) {
         </div>
       </div>
     `;
+  } else if (isSJ) {
+    // Surat Jalan: teks polos tanpa border, sesuai format cetak
+    const paymentData = data.payment || {};
+    const bankName = paymentData.bankName || 'BCA';
+    const accountNumber = paymentData.accountNumber || '3990361532';
+    const accountHolder = paymentData.accountHolder || 'Marsella';
+    paymentHtml = `
+      <div style="margin-top:22px;font-size:12px">
+        <div style="font-weight:700;margin-bottom:4px">Rekening Pembayaran</div>
+        <div>Nomor Rekening&nbsp;&nbsp;: ${accountNumber}</div>
+        <div>Bank ${bankName} a/n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;: ${accountHolder}</div>
+      </div>
+    `;
   }
 
   // Tanda tangan — tabel bordered 2 kolom, "Yang Menerima" & "Dibuat Oleh"
@@ -4358,17 +4432,25 @@ function generatePDFPreview(type) {
     </table>
   `;
 
+  // Header kanan: untuk Surat Jalan, tanggal ditampilkan di bawah alamat penerima (bukan tabel field kiri)
+  const tanggalRightHtml = isSJ
+    ? `<div style="display:flex;justify-content:space-between;margin-top:14px;font-size:12px;max-width:260px"><span>Tanggal&nbsp;:</span><span>${fmtDateIndo(doc.date)}</span></div>`
+    : '';
+
+  // Kategori barang (mis. "FOOD") — hanya untuk Surat Jalan, tampil sebagai judul seksi tebal bergaris bawah di atas tabel item
+  const categoryHtml = (isSJ && doc.category) ? `<div style="font-size:13px;font-weight:700;text-decoration:underline;margin-bottom:8px">${doc.category}</div>` : '';
+
   const pdfContent = document.getElementById('pdfContent');
   pdfContent.innerHTML = `
     <div class="pdf-content">
       <!-- HEADER: Logo + Nama Perusahaan + field dokumen (kiri) | Judul + Dikirim ke (kanan) -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid #000;gap:20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;${isSJ ? 'padding-bottom:0' : 'padding-bottom:14px;border-bottom:2px solid #000'};gap:20px">
         <div style="min-width:0;flex:1 1 50%">
           ${logo ? `<img src="${logo}" style="max-height:60px;max-width:180px;object-fit:contain;display:block;margin-bottom:8px">` : `<div style="font-size:26px;font-weight:800;margin-bottom:4px">${initials}</div>`}
           <div style="font-size:13px;font-weight:700;word-break:break-word;overflow-wrap:break-word">${profile.name}</div>
           ${profile.address ? `<div style="font-size:11px;margin-top:2px;word-break:break-word;overflow-wrap:break-word">${profile.address}</div>` : ''}
           ${profile.phone ? `<div style="font-size:11px;word-break:break-word;overflow-wrap:break-word">Telp: ${profile.phone}</div>` : ''}
-          <table style="border-collapse:collapse;margin-top:14px">${fieldRows}</table>
+          ${fieldRows ? `<table style="border-collapse:collapse;margin-top:14px">${fieldRows}</table>` : ''}
         </div>
         <div style="min-width:0;flex:1 1 50%">
           <h1 style="color:#000;font-size:26px;font-weight:800;margin:0 0 10px">${typeLabels[type]}</h1>
@@ -4376,9 +4458,11 @@ function generatePDFPreview(type) {
           <strong style="font-size:14px;text-decoration:underline;display:block;margin-top:2px">${partyName}</strong>
           ${partyAddr ? `<div style="font-size:12px;margin-top:4px;white-space:pre-line">${partyAddr}</div>` : ''}
           ${partyPhone ? `<div style="font-size:12px">Telp: ${partyPhone}</div>` : ''}
+          ${tanggalRightHtml}
         </div>
       </div>
       
+      ${categoryHtml}
       <!-- TABEL ITEM -->
       <table style="width:100%;border-collapse:collapse;margin:0 0 0;border:${BORDER}">
         <thead>
