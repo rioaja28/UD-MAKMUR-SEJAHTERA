@@ -4420,15 +4420,15 @@ function generatePDFPreview(type) {
     `;
   }
 
-  // Catatan — kotak bordered, label underline, untuk semua jenis dokumen
-  const catatanHtml = `
+  // Catatan — kotak bordered, label underline. Khusus Invoice, kotak ini dihilangkan.
+  const catatanHtml = isInv ? '' : `
     <div style="margin-top:20px;border:${BORDER};padding:10px 14px;min-height:70px">
       <div style="font-size:12px;text-decoration:underline;margin-bottom:6px">Catatan</div>
       <div style="font-size:12px">${doc.notes || ''}</div>
     </div>
   `;
 
-  // Payment — khusus Invoice
+  // Rekening Pembayaran — khusus Invoice, tanpa kotak/border
   let paymentHtml = '';
   if (isInv) {
     const paymentData = data.payment || {};
@@ -4437,8 +4437,8 @@ function generatePDFPreview(type) {
     const accountHolder = paymentData.accountHolder || 'KHANSA DWI AGUSTINA';
     paymentHtml = `
       <div style="display:flex;justify-content:flex-start;margin-top:14px">
-        <div style="padding:8px 10px;border:${BORDER};max-width:240px">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Payment</div>
+        <div style="padding:0;max-width:240px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Rekening Pembayaran</div>
           <table style="border-collapse:collapse;font-size:10px">
             <tr><td style="border:none;padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">Nama Bank</td><td style="border:none;padding:1px 0;font-weight:600;font-size:10px">: ${bankName}</td></tr>
             <tr><td style="border:none;padding:1px 6px 1px 0;white-space:nowrap;font-size:10px">No Rekening</td><td style="border:none;padding:1px 0;font-weight:600;font-size:10px">: ${accountNumber}</td></tr>
