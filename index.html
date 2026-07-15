@@ -1443,6 +1443,22 @@ if (firestoreAvailable) {
   try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    // Paksa pakai long-polling, bukan WebChannel streaming.
+    // Ini mengatasi error "WebChannel ... transport errored" / "Could not reach Cloud Firestore backend"
+    // yang biasa muncul kalau ada proxy/firewall/antivirus/ad-blocker yang memblokir koneksi streaming.
+    db.settings({
+      experimentalAutoDetectLongPolling: true,
+      useFetchStreams: false
+    });
+    // Aktifkan cache offline (IndexedDB) supaya perubahan yang disimpan SAAT KONEKSI
+    // LAGI JELEK/PUTUS tidak hilang begitu tab ditutup — perubahan itu akan tetap
+    // tersimpan di device ini dan otomatis dikirim ke server begitu koneksi pulih
+    // (walaupun app-nya sempat ditutup/di-reload). Tanpa ini, kalau device A nyimpen
+    // pas offline lalu tab-nya ditutup sebelum sempat kirim ke server, data itu
+    // hilang dan device B gak akan pernah lihat perubahan tsb.
+    db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+      console.warn('Firestore offline persistence tidak aktif (' + err.code + '), lanjut tanpa cache offline.');
+    });
     cloudDocRef = db.collection('erp').doc('main');
     auth = firebase.auth();
     storage = firebase.storage();
@@ -1658,6 +1674,7 @@ function persistData(data) {
   // Simpan ke cloud (debounce sedikit biar gak spam write kalau ada banyak perubahan beruntun)
   if (!firestoreAvailable) return;
   pendingCloudData = data;
+  hasUnsyncedChanges = true;
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(flushCloudSave, 400);
 }
@@ -1725,17 +1742,34 @@ function flushCloudSave() {
   if (!pendingCloudData || !firestoreAvailable || !cloudDocRef) return;
   const toSave = pendingCloudData;
   pendingCloudData = null;
-  cloudDocRef.set(toSave).catch(err => {
+  cloudDocRef.set(toSave).then(() => {
+    hasUnsyncedChanges = false;
+  }).catch(err => {
     console.error('Gagal menyimpan ke cloud:', err);
     showToast('Gagal sinkron ke cloud. Cek koneksi internet.');
   });
 }
+
+// Dipakai buat peringatin user kalau nutup tab/app padahal masih ada
+// perubahan yang belum sempat terkirim ke server (mis. baru aja Simpan,
+// terus langsung nutup tab dalam <400ms, atau lagi offline).
+let hasUnsyncedChanges = false;
 
 // Begitu tab/app di-minimize, pindah app, atau ditutup — paksa kirim sisa data yang pending
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushCloudSave();
 });
 window.addEventListener('pagehide', flushCloudSave);
+// Kalau user coba nutup tab/browser padahal perubahan terakhir belum kekonfirmasi
+// kekirim ke server (mis. lagi offline), kasih peringatan browser bawaan supaya
+// user tau data ini mungkin belum keliatan di device lain sampai koneksi pulih.
+window.addEventListener('beforeunload', (e) => {
+  flushCloudSave();
+  if (hasUnsyncedChanges) {
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 function escapeHtml(str) {
   const div = document.createElement('div');
