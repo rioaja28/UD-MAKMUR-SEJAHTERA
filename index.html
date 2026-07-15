@@ -692,28 +692,25 @@
 
       <div class="table-card">
         <div class="table-header">
-          <div class="table-title">🏦 Pengaturan Detail Pembayaran</div>
+          <div class="table-title">🏦 Rekening Pembayaran</div>
+          <button class="btn btn-primary btn-sm" onclick="openPaymentAccountModal()">+ Tambah Rekening</button>
         </div>
         <div class="modal-body">
-          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Atur detail rekening bank yang akan ditampilkan di Invoice. Data ini akan otomatis tampil di bagian "Payment" pada preview dan download PDF Invoice.</p>
-          
-          <div class="form-group full">
-            <label>Nama Bank</label>
-            <input type="text" id="bankName" placeholder="Contoh: BCA">
-          </div>
-
-          <div class="form-group full" style="margin-top: 20px;">
-            <label>No Rekening</label>
-            <input type="text" id="bankAccountNumber" placeholder="Contoh: 108-298-2153">
-          </div>
-
-          <div class="form-group full" style="margin-top: 20px;">
-            <label>Atas Nama</label>
-            <input type="text" id="bankAccountHolder" placeholder="Nama lengkap pemilik rekening">
-          </div>
-
-          <div style="margin-top: 20px;">
-            <button class="btn btn-primary" onclick="saveSettings()">💾 Simpan Pengaturan</button>
+          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Kelola satu atau lebih rekening bank yang bisa ditampilkan di Invoice / Surat Jalan. Cocok kalau tiap outlet transfer ke rekening yang berbeda — atur rekening default per outlet di menu Supplier/Outlet, atau pilih rekening lain langsung saat membuat Surat Jalan/Invoice.</p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Bank</th>
+                  <th>No Rekening</th>
+                  <th>Atas Nama</th>
+                  <th>Default</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="paymentAccountsTable"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1301,10 +1298,51 @@
         <input type="checkbox" id="customer-show-rekening" style="width:auto">
         <label style="margin:0" for="customer-show-rekening">Tampilkan Rekening Pembayaran di Surat Jalan (khusus Outlet)</label>
       </div>
+      <div class="form-group full" style="margin-top:14px">
+        <label>Rekening Pembayaran Default Outlet Ini (Opsional)</label>
+        <select id="customer-payment-account"></select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('customerModal')">Batal</button>
       <button class="btn btn-primary" id="customerSaveBtn" onclick="saveCustomerModal()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT ACCOUNT MODAL -->
+<div class="modal-overlay" id="paymentAccountModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="paymentAccountModalTitle">Tambah Rekening Pembayaran</div>
+      <button class="modal-close" onclick="closeModal('paymentAccountModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pa-edit-id" value="">
+      <div class="form-group full">
+        <label>Label Rekening</label>
+        <input type="text" id="pa-label" placeholder="Contoh: Rekening Outlet Jakarta">
+      </div>
+      <div class="form-group full" style="margin-top:16px">
+        <label>Nama Bank</label>
+        <input type="text" id="pa-bank-name" placeholder="Contoh: BCA">
+      </div>
+      <div class="form-group full" style="margin-top:16px">
+        <label>No Rekening</label>
+        <input type="text" id="pa-account-number" placeholder="Contoh: 108-298-2153">
+      </div>
+      <div class="form-group full" style="margin-top:16px">
+        <label>Atas Nama</label>
+        <input type="text" id="pa-account-holder" placeholder="Nama lengkap pemilik rekening">
+      </div>
+      <div class="form-group full" style="display:flex;align-items:center;gap:8px;margin-top:16px">
+        <input type="checkbox" id="pa-is-default" style="width:auto">
+        <label style="margin:0" for="pa-is-default">Jadikan rekening default toko</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('paymentAccountModal')">Batal</button>
+      <button class="btn btn-primary" id="paymentAccountSaveBtn" onclick="savePaymentAccountModal()">Simpan</button>
     </div>
   </div>
 </div>
@@ -1496,7 +1534,7 @@ const statuses = ['Draft', 'Confirmed', 'Completed', 'Cancelled'];
 const colors = { Draft: '#6BB5E8', Confirmed: '#7C6FF7', Completed: '#5EC68A', Cancelled: '#FF7B6E' };
 
 const emptyData = () => ({
-  products: [], customers: [], pos: [], sos: [], invs: [], masuks: [], sttps: [], payments: [], profile: {}, company: {}, payment: {}, logo: ''
+  products: [], customers: [], pos: [], sos: [], invs: [], masuks: [], sttps: [], payments: [], profile: {}, company: {}, payment: {}, paymentAccounts: [], logo: ''
 });
 
 let appDataCache = emptyData();
@@ -1518,6 +1556,7 @@ async function fetchCloudData() {
       profile: JSON.parse(localStorage.getItem('profile') || '{}'),
       company: JSON.parse(localStorage.getItem('company') || '{}'),
       payment: JSON.parse(localStorage.getItem('payment') || '{}'),
+      paymentAccounts: JSON.parse(localStorage.getItem('paymentAccounts') || '[]'),
       logo: localStorage.getItem('logo') || ''
     };
     return;
@@ -1550,6 +1589,7 @@ async function fetchCloudData() {
         profile: JSON.parse(localStorage.getItem('profile') || '{}'),
         company: JSON.parse(localStorage.getItem('company') || '{}'),
         payment: JSON.parse(localStorage.getItem('payment') || '{}'),
+        paymentAccounts: JSON.parse(localStorage.getItem('paymentAccounts') || '[]'),
         logo: localStorage.getItem('logo') || ''
       };
       appDataCache = legacy;
@@ -1570,6 +1610,7 @@ async function fetchCloudData() {
       profile: JSON.parse(localStorage.getItem('profile') || '{}'),
       company: JSON.parse(localStorage.getItem('company') || '{}'),
       payment: JSON.parse(localStorage.getItem('payment') || '{}'),
+      paymentAccounts: JSON.parse(localStorage.getItem('paymentAccounts') || '[]'),
       logo: localStorage.getItem('logo') || ''
     };
     cloudReady = false;
@@ -1686,6 +1727,7 @@ function persistData(data) {
     localStorage.setItem('profile', JSON.stringify(data.profile));
     localStorage.setItem('company', JSON.stringify(data.company));
     localStorage.setItem('payment', JSON.stringify(data.payment || {}));
+    localStorage.setItem('paymentAccounts', JSON.stringify(data.paymentAccounts || []));
     if (data.logo) localStorage.setItem('logo', data.logo);
   } catch (e) { /* ignore quota errors */ }
 
@@ -1838,6 +1880,67 @@ function getCompanyProfile() {
   };
 }
 
+// ===== REKENING PEMBAYARAN (multi rekening) =====
+// Kalau device/akun ini masih pakai data lama (satu rekening di data.payment) dan
+// belum punya data.paymentAccounts sama sekali, migrasi otomatis jadi 1 entri
+// array supaya semua fitur baru (pilih rekening per outlet/dokumen) tetap jalan.
+function ensurePaymentAccountsMigrated() {
+  const data = loadData();
+  if ((!data.paymentAccounts || data.paymentAccounts.length === 0) && data.payment && data.payment.bankName) {
+    data.paymentAccounts = [{
+      id: 'legacy-' + Date.now(),
+      label: 'Rekening Utama',
+      bankName: data.payment.bankName || '',
+      accountNumber: data.payment.accountNumber || '',
+      accountHolder: data.payment.accountHolder || '',
+      isDefault: true
+    }];
+    saveData(data);
+  }
+}
+
+// Ambil daftar rekening yang ada (array kosong kalau belum diisi sama sekali)
+function getPaymentAccounts(data) {
+  data = data || loadData();
+  return data.paymentAccounts || [];
+}
+
+// Rekening default toko (dipakai kalau outlet/dokumen gak nentuin rekening spesifik)
+function getDefaultPaymentAccount(data) {
+  const accounts = getPaymentAccounts(data);
+  if (accounts.length === 0) return null;
+  return accounts.find(a => a.isDefault) || accounts[0];
+}
+
+// Tentukan rekening pembayaran mana yang dipakai untuk sebuah dokumen (SJ/Invoice):
+// prioritas 1) rekening yang dipilih manual di dokumen itu sendiri,
+// 2) rekening default outlet/customer-nya, 3) rekening default toko.
+function resolvePaymentAccount(data, doc, partyRecord) {
+  const accounts = getPaymentAccounts(data);
+  if (accounts.length === 0) return null;
+  let acc = null;
+  if (doc && doc.paymentAccountId) acc = accounts.find(a => String(a.id) === String(doc.paymentAccountId));
+  if (!acc && partyRecord && partyRecord.paymentAccountId) acc = accounts.find(a => String(a.id) === String(partyRecord.paymentAccountId));
+  if (!acc) acc = accounts.find(a => a.isDefault) || accounts[0];
+  return acc || null;
+}
+
+// Isi <select> dengan daftar rekening pembayaran. Opsi pertama = "Ikuti Default"
+// (artinya biarkan sistem yang nentuin sesuai urutan prioritas di resolvePaymentAccount).
+function populatePaymentAccountSelect(selectId, selectedId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const data = loadData();
+  const accounts = getPaymentAccounts(data);
+  let html = `<option value="">— Ikuti Rekening Default Outlet/Toko —</option>`;
+  html += accounts.map(a => {
+    const label = a.label ? a.label : (a.bankName || 'Rekening');
+    return `<option value="${a.id}">${label} — ${a.bankName || ''} ${a.accountNumber || ''}</option>`;
+  }).join('');
+  sel.innerHTML = html;
+  sel.value = selectedId || '';
+}
+
 function rupiah(num) {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
 }
@@ -1967,11 +2070,6 @@ function saveSettings() {
     address: document.getElementById('companyAddress').value,
     phone: document.getElementById('companyPhone').value
   };
-  data.payment = {
-    bankName: document.getElementById('bankName').value || 'BCA',
-    accountNumber: document.getElementById('bankAccountNumber').value || '108-298-2153',
-    accountHolder: document.getElementById('bankAccountHolder').value || 'KHANSA DWI AGUSTINA'
-  };
   saveData(data);
   updateStoreBranding();
   showToast('Pengaturan berhasil disimpan!');
@@ -1985,9 +2083,105 @@ function loadSettings() {
   document.getElementById('companyName').value = data.company?.name || 'Nama Toko Anda';
   document.getElementById('companyAddress').value = data.company?.address || '';
   document.getElementById('companyPhone').value = data.company?.phone || '';
-  document.getElementById('bankName').value = data.payment?.bankName || 'BCA';
-  document.getElementById('bankAccountNumber').value = data.payment?.accountNumber || '108-298-2153';
-  document.getElementById('bankAccountHolder').value = data.payment?.accountHolder || 'KHANSA DWI AGUSTINA';
+  ensurePaymentAccountsMigrated();
+  renderPaymentAccounts();
+}
+
+// ===== MANAJEMEN REKENING PEMBAYARAN (multi rekening) =====
+function renderPaymentAccounts() {
+  const tbody = document.getElementById('paymentAccountsTable');
+  if (!tbody) return;
+  const data = loadData();
+  const accounts = getPaymentAccounts(data);
+  if (accounts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px 12px">Belum ada rekening. Klik "+ Tambah Rekening" untuk menambahkan.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = accounts.map(a => `
+    <tr>
+      <td>${a.label || '-'}</td>
+      <td>${a.bankName || '-'}</td>
+      <td>${a.accountNumber || '-'}</td>
+      <td>${a.accountHolder || '-'}</td>
+      <td>${a.isDefault ? '<span class="badge badge-green">Default</span>' : ''}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn btn-outline btn-sm" onclick="openPaymentAccountModal('${a.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePaymentAccount('${a.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openPaymentAccountModal(id) {
+  const data = loadData();
+  const accounts = getPaymentAccounts(data);
+  const acc = id ? accounts.find(a => String(a.id) === String(id)) : null;
+  document.getElementById('pa-edit-id').value = acc ? acc.id : '';
+  document.getElementById('paymentAccountModalTitle').textContent = acc ? 'Edit Rekening Pembayaran' : 'Tambah Rekening Pembayaran';
+  document.getElementById('pa-label').value = acc?.label || '';
+  document.getElementById('pa-bank-name').value = acc?.bankName || '';
+  document.getElementById('pa-account-number').value = acc?.accountNumber || '';
+  document.getElementById('pa-account-holder').value = acc?.accountHolder || '';
+  document.getElementById('pa-is-default').checked = acc ? !!acc.isDefault : accounts.length === 0;
+  document.getElementById('paymentAccountModal').classList.add('open');
+}
+
+function savePaymentAccountModal() {
+  const data = loadData();
+  if (!data.paymentAccounts) data.paymentAccounts = [];
+  const editId = document.getElementById('pa-edit-id').value;
+  const bankName = document.getElementById('pa-bank-name').value.trim();
+  const accountNumber = document.getElementById('pa-account-number').value.trim();
+  if (!bankName || !accountNumber) {
+    alert('Nama Bank dan No Rekening tidak boleh kosong');
+    return;
+  }
+  const isDefault = document.getElementById('pa-is-default').checked;
+  const payload = {
+    label: document.getElementById('pa-label').value.trim() || bankName,
+    bankName,
+    accountNumber,
+    accountHolder: document.getElementById('pa-account-holder').value.trim(),
+    isDefault
+  };
+
+  // Kalau rekening ini dijadikan default, matikan status default rekening lainnya
+  // dulu (cuma boleh ada 1 rekening default toko).
+  if (isDefault) {
+    data.paymentAccounts.forEach(a => { a.isDefault = false; });
+  }
+
+  if (editId) {
+    const idx = data.paymentAccounts.findIndex(a => String(a.id) === String(editId));
+    if (idx !== -1) data.paymentAccounts[idx] = { ...data.paymentAccounts[idx], ...payload };
+  } else {
+    data.paymentAccounts.push({ id: Date.now(), ...payload });
+  }
+
+  // Kalau belum ada rekening default sama sekali, jadikan rekening pertama sbg default
+  if (!data.paymentAccounts.some(a => a.isDefault) && data.paymentAccounts.length > 0) {
+    data.paymentAccounts[0].isDefault = true;
+  }
+
+  saveData(data);
+  closeModal('paymentAccountModal');
+  renderPaymentAccounts();
+  showToast('Rekening pembayaran berhasil disimpan!');
+}
+
+function deletePaymentAccount(id) {
+  if (!confirm('Hapus rekening pembayaran ini?')) return;
+  const data = loadData();
+  data.paymentAccounts = (data.paymentAccounts || []).filter(a => String(a.id) !== String(id));
+  // Kalau rekening yang dihapus adalah default, jadikan rekening pertama yg tersisa sbg default
+  if (data.paymentAccounts.length > 0 && !data.paymentAccounts.some(a => a.isDefault)) {
+    data.paymentAccounts[0].isDefault = true;
+  }
+  saveData(data);
+  renderPaymentAccounts();
+  showToast('Rekening pembayaran dihapus.');
 }
 
 function saveProfile() {
