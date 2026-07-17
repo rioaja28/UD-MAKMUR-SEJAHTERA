@@ -4806,12 +4806,12 @@ function generatePDFPreview(type) {
   // Tabel item — No. Barang, Nama Barang, Qty, Satuan, Harga, Total Harga (grid penuh ala Excel)
   let itemRows = doc.items.map((item, idx) => {
     return `<tr>
-      <td style="border:${BORDER};padding:6px 8px;text-align:center">${idx + 1}</td>
-      <td style="border:${BORDER};padding:6px 8px">${item.name}</td>
-      <td style="border:${BORDER};padding:6px 8px;text-align:center">${item.qty}</td>
-      <td style="border:${BORDER};padding:6px 8px;text-align:center">${item.uom || 'pcs'}</td>
-      <td style="border:${BORDER};padding:6px 8px;text-align:right">${item.price?.toLocaleString('id-ID') || '0'}</td>
-      <td style="border:${BORDER};padding:6px 8px;text-align:right">${(item.qty * item.price).toLocaleString('id-ID')}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:center;font-size:11px">${idx + 1}</td>
+      <td style="border:${BORDER};padding:6px 8px;font-size:11px;white-space:nowrap">${item.name}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:center;font-size:11px">${item.qty}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:center;font-size:11px;white-space:nowrap">${item.uom || 'pcs'}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:right;font-size:11px">${item.price?.toLocaleString('id-ID') || '0'}</td>
+      <td style="border:${BORDER};padding:6px 8px;text-align:right;font-size:11px">${(item.qty * item.price).toLocaleString('id-ID')}</td>
     </tr>`;
   }).join('');
 
@@ -4959,12 +4959,12 @@ function generatePDFPreview(type) {
       <table style="width:100%;border-collapse:collapse;margin:0 0 0;border:${BORDER}">
         <thead>
           <tr>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">No</th>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Nama Barang</th>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:60px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Qty</th>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:80px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Satuan</th>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:90px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Harga</th>
-            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;width:100px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Total Harga</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;min-width:60px;white-space:nowrap;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">No</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;min-width:220px;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal;white-space:nowrap">Nama Barang</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;min-width:60px;white-space:nowrap;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Qty</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;min-width:80px;white-space:nowrap;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Satuan</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;min-width:75px;white-space:nowrap;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Harga</th>
+            <th style="border:${BORDER};text-align:center;padding:7px 8px;font-size:11px;min-width:85px;white-space:nowrap;color:#000;background:#fff;font-weight:700;text-transform:none;letter-spacing:normal">Total Harga</th>
           </tr>
         </thead>
         <tbody>${itemRows}</tbody>
