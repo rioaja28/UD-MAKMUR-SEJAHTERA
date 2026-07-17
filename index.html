@@ -1513,34 +1513,23 @@ if (firestoreAvailable) {
   try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
-    // PENTING: semua opsi Firestore digabung jadi SATU panggilan settings().
-    // Sebelumnya settings() dan enablePersistence() dipanggil terpisah — padahal
-    // enablePersistence() diam-diam manggil settings() lagi di baliknya, makanya
-    // muncul warning "You are overriding the original host". enablePersistence()
-    // juga sudah deprecated, diganti dengan opsi `cache` di settings() (API baru).
-    try {
-      db.settings({
-        // Paksa pakai long-polling, bukan WebChannel streaming.
-        // Ini mengatasi error "WebChannel ... transport errored" / "Could not
-        // reach Cloud Firestore backend" yang biasa muncul kalau ada proxy/
-        // firewall/antivirus/ad-blocker yang memblokir koneksi streaming.
-        experimentalAutoDetectLongPolling: true,
-        useFetchStreams: false,
-        // Aktifkan cache offline (IndexedDB), multi-tab, lewat API baru
-        // (bukan enableMultiTabIndexedDbPersistence yang sudah deprecated).
-        // Perubahan yang disimpan SAAT KONEKSI LAGI JELEK/PUTUS tidak hilang
-        // begitu tab ditutup — tetap tersimpan di device ini dan otomatis
-        // terkirim ke server begitu koneksi pulih (walau app sempat ditutup/reload).
-        cache: firebase.firestore.persistentLocalCache({
-          tabManager: firebase.firestore.persistentMultipleTabManager()
-        })
-      });
-    } catch (err) {
-      // Kalau gagal (misal browser tidak dukung IndexedDB / private mode),
-      // lanjut tanpa cache offline, jangan sampai app gagal total.
-      console.warn('Firestore offline cache tidak aktif (' + err.code + '), lanjut tanpa cache offline.');
-      db.settings({ experimentalAutoDetectLongPolling: true, useFetchStreams: false });
-    }
+    // PENTING: hanya SATU kali panggilan settings(), dan TANPA cache IndexedDB.
+    // Sebelumnya sempat dicoba pakai persistentLocalCache (cache offline via
+    // IndexedDB), tapi di sebagian browser/environment (mode private/incognito
+    // yang strict, webview/iframe sandbox, storage pihak-ketiga diblok, dll)
+    // IndexedDB-nya gagal dibuka dan bikin Firestore crash internal ("zombie
+    // client id", "Cannot set properties of null (setting 'onsuccess')").
+    // Jadi sengaja TIDAK pakai cache offline sama sekali — app tetap jalan
+    // normal (data ke-cache di memory selama tab kebuka), cuma tidak
+    // persist ke disk kalau tab ditutup. Ini paling stabil di semua browser.
+    db.settings({
+      // Paksa pakai long-polling, bukan WebChannel streaming.
+      // Ini mengatasi error "WebChannel ... transport errored" / "Could not
+      // reach Cloud Firestore backend" yang biasa muncul kalau ada proxy/
+      // firewall/antivirus/ad-blocker yang memblokir koneksi streaming.
+      experimentalAutoDetectLongPolling: true,
+      useFetchStreams: false
+    });
     cloudDocRef = db.collection('erp').doc('main');
     auth = firebase.auth();
     storage = firebase.storage();
@@ -3196,28 +3185,39 @@ function selectPOItem(element, name, sku, price, uom) {
 }
 
 function calculateTotal() {
-  const rows = document.querySelectorAll('#po-items tr, #so-items tr, #inv-items tr');
-  let total = 0;
-  
-  rows.forEach(row => {
-    const qty = parseFloat(row.querySelector('[name="qty"]')?.value || 0);
-    const price = parseFloat(row.querySelector('[name="itemPrice"]')?.value || 0);
-    const subtotal = qty * price;
-    const subtotalInput = row.querySelector('[name="subtotal"]');
-    if (subtotalInput) subtotalInput.value = subtotal;
-    total += subtotal;
-  });
-  
+  // PENTING: PO, Surat Jalan, dan Invoice masing-masing dihitung TERPISAH.
+  // Sebelumnya semua baris dari #po-items + #so-items + #inv-items dijumlah
+  // jadi SATU variabel `total`, jadi kalau ada sisa baris item nyangkut di
+  // tabel modal lain (belum ke-reset bersih), totalnya ikut kecampur dan
+  // hasilnya jadi salah (kelihatan kayak total gabungan, bukan total
+  // dokumen yang lagi diedit/dibuat).
+
+  const calcSection = (selector) => {
+    let subtotal = 0;
+    document.querySelectorAll(selector).forEach(row => {
+      const qty = parseFloat(row.querySelector('[name="qty"]')?.value || 0);
+      const price = parseFloat(row.querySelector('[name="itemPrice"]')?.value || 0);
+      const rowSubtotal = qty * price;
+      const subtotalInput = row.querySelector('[name="subtotal"]');
+      if (subtotalInput) subtotalInput.value = rowSubtotal;
+      subtotal += rowSubtotal;
+    });
+    return subtotal;
+  };
+
+  const poSubtotal = calcSection('#po-items tr');
   const poDiscount = parseFloat(document.getElementById('po-discount')?.value || 0);
   const poTotal = document.getElementById('po-total');
-  if (poTotal) poTotal.textContent = rupiah(Math.max(0, total - poDiscount));
-  
+  if (poTotal) poTotal.textContent = rupiah(Math.max(0, poSubtotal - poDiscount));
+
+  const soSubtotal = calcSection('#so-items tr');
   const soTotal = document.getElementById('so-total');
-  if (soTotal) soTotal.textContent = rupiah(total);
-  
+  if (soTotal) soTotal.textContent = rupiah(soSubtotal);
+
+  const invSubtotal = calcSection('#inv-items tr');
   const invDiscount = parseFloat(document.getElementById('inv-discount')?.value || 0);
   const invTotal = document.getElementById('inv-total');
-  if (invTotal) invTotal.textContent = rupiah(Math.max(0, total - invDiscount));
+  if (invTotal) invTotal.textContent = rupiah(Math.max(0, invSubtotal - invDiscount));
 }
 
 function openPOModal() {
