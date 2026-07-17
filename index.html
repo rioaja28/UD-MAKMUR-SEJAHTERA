@@ -198,6 +198,8 @@
   .toast-undo-btn:hover { opacity: 0.85; }
   .sync-indicator { position: fixed; top: 16px; right: 20px; background: var(--green); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; z-index: 1000; opacity: 0; transform: translateY(-8px); pointer-events: none; transition: opacity 0.25s, transform 0.25s; display:flex; align-items:center; gap:6px; box-shadow: 0 8px 20px -6px rgba(21,21,43,0.3); }
   .sync-indicator.show { opacity: 1; transform: translateY(0); }
+  .offline-banner { position: fixed; top: 0; left: 0; right: 0; background: #FF6B6B; color: #fff; text-align: center; font-size: 13px; font-weight: 600; padding: 8px 12px; z-index: 2000; transform: translateY(-100%); transition: transform 0.25s; }
+  .offline-banner.show { transform: translateY(0); }
   @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
   /* PDF Preview */
@@ -321,6 +323,7 @@
 <body>
 
 <div class="sync-indicator" id="syncIndicator">🔄 Data diperbarui otomatis</div>
+<div class="offline-banner" id="offlineBanner">📡 Mode Offline — perubahan disimpan di HP/laptop ini dan akan otomatis sync begitu koneksi internet kembali</div>
 
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
@@ -1510,22 +1513,34 @@ if (firestoreAvailable) {
   try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
-    // Paksa pakai long-polling, bukan WebChannel streaming.
-    // Ini mengatasi error "WebChannel ... transport errored" / "Could not reach Cloud Firestore backend"
-    // yang biasa muncul kalau ada proxy/firewall/antivirus/ad-blocker yang memblokir koneksi streaming.
-    db.settings({
-      experimentalAutoDetectLongPolling: true,
-      useFetchStreams: false
-    });
-    // Aktifkan cache offline (IndexedDB) supaya perubahan yang disimpan SAAT KONEKSI
-    // LAGI JELEK/PUTUS tidak hilang begitu tab ditutup — perubahan itu akan tetap
-    // tersimpan di device ini dan otomatis dikirim ke server begitu koneksi pulih
-    // (walaupun app-nya sempat ditutup/di-reload). Tanpa ini, kalau device A nyimpen
-    // pas offline lalu tab-nya ditutup sebelum sempat kirim ke server, data itu
-    // hilang dan device B gak akan pernah lihat perubahan tsb.
-    db.enablePersistence({ synchronizeTabs: true }).catch(err => {
-      console.warn('Firestore offline persistence tidak aktif (' + err.code + '), lanjut tanpa cache offline.');
-    });
+    // PENTING: semua opsi Firestore digabung jadi SATU panggilan settings().
+    // Sebelumnya settings() dan enablePersistence() dipanggil terpisah — padahal
+    // enablePersistence() diam-diam manggil settings() lagi di baliknya, makanya
+    // muncul warning "You are overriding the original host". enablePersistence()
+    // juga sudah deprecated, diganti dengan opsi `cache` di settings() (API baru).
+    try {
+      db.settings({
+        // Paksa pakai long-polling, bukan WebChannel streaming.
+        // Ini mengatasi error "WebChannel ... transport errored" / "Could not
+        // reach Cloud Firestore backend" yang biasa muncul kalau ada proxy/
+        // firewall/antivirus/ad-blocker yang memblokir koneksi streaming.
+        experimentalAutoDetectLongPolling: true,
+        useFetchStreams: false,
+        // Aktifkan cache offline (IndexedDB), multi-tab, lewat API baru
+        // (bukan enableMultiTabIndexedDbPersistence yang sudah deprecated).
+        // Perubahan yang disimpan SAAT KONEKSI LAGI JELEK/PUTUS tidak hilang
+        // begitu tab ditutup — tetap tersimpan di device ini dan otomatis
+        // terkirim ke server begitu koneksi pulih (walau app sempat ditutup/reload).
+        cache: firebase.firestore.persistentLocalCache({
+          tabManager: firebase.firestore.persistentMultipleTabManager()
+        })
+      });
+    } catch (err) {
+      // Kalau gagal (misal browser tidak dukung IndexedDB / private mode),
+      // lanjut tanpa cache offline, jangan sampai app gagal total.
+      console.warn('Firestore offline cache tidak aktif (' + err.code + '), lanjut tanpa cache offline.');
+      db.settings({ experimentalAutoDetectLongPolling: true, useFetchStreams: false });
+    }
     cloudDocRef = db.collection('erp').doc('main');
     auth = firebase.auth();
     storage = firebase.storage();
@@ -5257,6 +5272,20 @@ function toggleSidebar() {
   document.getElementById('sidebarBackdrop').classList.toggle('show');
 }
 
+// Tampilkan banner "Mode Offline" berdasarkan status koneksi internet browser.
+// Ini yang bikin error "Could not reach Cloud Firestore backend" di console
+// jadi kelihatan jelas ke user (bukan cuma warning tersembunyi) — dan user
+// tau data mereka aman tersimpan lokal + bakal auto-sync begitu online lagi.
+function updateOfflineBanner() {
+  const el = document.getElementById('offlineBanner');
+  if (!el) return;
+  el.classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', updateOfflineBanner);
+window.addEventListener('offline', updateOfflineBanner);
+document.addEventListener('DOMContentLoaded', updateOfflineBanner);
+updateOfflineBanner();
+
 function closeSidebar() {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarBackdrop').classList.remove('show');
@@ -6830,14 +6859,10 @@ function startApp() {
   resetInvModal();
   resetMasukModal();
   
-  document.querySelectorAll('.modal-overlay').forEach(m => {
-    m.addEventListener('click', e => {
-      if (e.target === m) {
-        m.classList.remove('open');
-        flushPendingRealtimeUpdate();
-      }
-    });
-  });
+  // Klik di luar modal (backdrop) sengaja DINONAKTIFKAN.
+  // Modal cuma bisa ditutup lewat tombol × atau tombol "Batal",
+  // biar data yang udah diisi (misal PO dengan banyak barang) ga hilang
+  // kalau ga sengaja klik di luar area modal.
   
   loadSettings();
 
