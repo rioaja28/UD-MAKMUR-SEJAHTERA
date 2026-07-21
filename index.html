@@ -3546,8 +3546,9 @@ function populatePORefSelect(selectedId) {
   const data = loadData();
   const select = document.getElementById('so-po-ref');
   if (!select) return;
+  const availablePOs = data.pos.filter(po => po.status !== 'Selesai' || po.id == selectedId);
   select.innerHTML = `<option value="">-- Tanpa referensi PO --</option>` +
-    data.pos.filter(po => po.status !== 'Selesai').map(po => {
+    availablePOs.map(po => {
       const outlet = data.customers.find(c => c.id == po.supplier)?.name || 'Unknown';
       return `<option value="${po.id}" ${po.id == selectedId ? 'selected' : ''}>${po.no} - ${outlet}</option>`;
     }).join('');
@@ -4668,6 +4669,9 @@ function previewSO() {
     price: parseFloat(row.querySelector('[name="itemPrice"]').value)
   }));
   
+  const poRefId = document.getElementById('so-po-ref').value || null;
+  const poRef = poRefId ? data.pos.find(p => p.id == poRefId) : null;
+
   const so = {
     no: document.getElementById('so-no').value || generateSJNumber(getCustomerNameById(document.getElementById('so-customer').value)) || generateNo('SJ'),
     customer: document.getElementById('so-customer').value,
@@ -4676,7 +4680,9 @@ function previewSO() {
     driver: document.getElementById('so-driver').value,
     status: document.getElementById('so-status').value || 'Dikirim',
     category: document.getElementById('so-category').value || '',
-    paymentAccountId: document.getElementById('so-payment-account').value || null
+    paymentAccountId: document.getElementById('so-payment-account').value || null,
+    poId: poRefId,
+    poNo: poRef ? poRef.no : (editingSOId ? (data.sos.find(s => s.id === editingSOId)?.poNo || null) : null)
   };
   
   pdfDocData = { type: 'so', doc: so };
