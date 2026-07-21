@@ -3308,7 +3308,7 @@ function renderPOs() {
   const data = loadData();
   const tbody = document.getElementById('po-table');
   
-  tbody.innerHTML = data.pos.map(po => {
+  tbody.innerHTML = [...data.pos].reverse().map(po => {
     const supplier = data.customers.find(c => c.id == po.supplier)?.name || 'Unknown';
     const total = po.items.reduce((sum, item) => sum + (item.qty * item.price), 0) - (po.discount || 0);
     const badgeClass = po.status === 'Selesai' ? 'badge-green' : po.status === 'Diproses' ? 'badge-amber' : 'badge-blue';
@@ -3450,7 +3450,7 @@ function renderMasuk() {
   const data = loadData();
   const tbody = document.getElementById('masuk-table');
   
-  tbody.innerHTML = data.masuks.map(masuk => {
+  tbody.innerHTML = [...data.masuks].reverse().map(masuk => {
     const supplier = data.customers.find(c => c.id == masuk.supplier)?.name || '-';
     return `
     <tr>
@@ -3673,7 +3673,7 @@ function renderSOs() {
   const data = loadData();
   const tbody = document.getElementById('so-table');
   
-  tbody.innerHTML = data.sos.map(so => {
+  tbody.innerHTML = [...data.sos].reverse().map(so => {
     const customer = data.customers.find(c => c.id == so.customer)?.name || 'Unknown';
     const badgeClass = so.status === 'Selesai' ? 'badge-green' : 'badge-blue';
     const photoCount = (so.photos || []).length;
@@ -4066,7 +4066,7 @@ function renderInvs() {
     invNos.forEach(no => sentInvNos.add(no));
   });
 
-  tbody.innerHTML = data.invs.map(inv => {
+  tbody.innerHTML = [...data.invs].reverse().map(inv => {
     const customer = data.customers.find(c => c.id == inv.customer)?.name || 'Unknown';
     const total = inv.items.reduce((sum, item) => sum + (item.qty * item.price), 0) - (inv.discount || 0);
     const isLunas = inv.status === 'Lunas';
