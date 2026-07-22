@@ -465,6 +465,7 @@
       <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
         <button class="btn btn-primary" onclick="openPOModal()">+ Buat PO</button>
         <button class="btn btn-success" onclick="exportTableToExcel('po')">📤 Export Excel</button>
+        <input type="text" id="po-search" placeholder="🔍 Cari No PO / Outlet / Status..." oninput="renderPOs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -515,6 +516,7 @@
       <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
         <button class="btn btn-primary" onclick="openSOModal()">+ Buat Surat Jalan</button>
         <button class="btn btn-success" onclick="exportTableToExcel('so')">📤 Export Excel</button>
+        <input type="text" id="so-search" placeholder="🔍 Cari No SJ / Customer / Ref PO / Status..." oninput="renderSOs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -542,6 +544,7 @@
         <button class="btn btn-primary" onclick="openInvModal()">+ Buat Invoice</button>
         <button class="btn" style="background:#2E7D32;color:#fff" onclick="openPaymentModal()">💵 Catat Pembayaran Transfer</button>
         <button class="btn btn-success" onclick="exportTableToExcel('inv')">📤 Export Excel</button>
+        <input type="text" id="inv-search" placeholder="🔍 Cari No Invoice / Customer / Ref SJ / Status..." oninput="renderInvs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -1552,6 +1555,55 @@ const emptyData = () => ({
   products: [], customers: [], pos: [], sos: [], invs: [], masuks: [], sttps: [], payments: [], profile: {}, company: {}, payment: {}, paymentAccounts: [], logo: ''
 });
 
+// ===== SAVE AMAN (biar data gak ketiban kalau lebih dari 1 orang pakai app bersamaan) =====
+// lastSyncedSnapshot = kondisi data terakhir yang KITA TAHU sama persis dengan cloud
+// (baru diambil / baru di-onSnapshot), dipakai sebagai "titik pembanding" (base) buat
+// nge-merge 3 arah: base vs punya kita (mine) vs punya server saat ini (theirs).
+let lastSyncedSnapshot = null;
+function markSynced(d) {
+  try { lastSyncedSnapshot = JSON.parse(JSON.stringify(d)); } catch (e) { lastSyncedSnapshot = d; }
+}
+
+// Field-field yang berupa array-of-object ber-ID, digabung per-item (bukan ditimpa bulat).
+const ARRAY_MERGE_KEYS = ['products', 'customers', 'pos', 'sos', 'invs', 'masuks', 'sttps', 'payments', 'paymentAccounts'];
+
+function mergeArrayByBase(base, mine, theirs) {
+  base = base || []; mine = mine || []; theirs = theirs || [];
+  const baseIds = new Set(base.map(x => x.id));
+  const mineMap = new Map(mine.map(x => [x.id, x]));
+  const theirsMap = new Map(theirs.map(x => [x.id, x]));
+  const orderIds = []; // urutan: ikutin urutan `theirs` dulu, baru tambahan baru dari `mine`
+  theirs.forEach(x => orderIds.push(x.id));
+  mine.forEach(x => { if (!orderIds.includes(x.id)) orderIds.push(x.id); });
+
+  const result = [];
+  for (const id of orderIds) {
+    const inBase = baseIds.has(id);
+    const inMine = mineMap.has(id);
+    const inTheirs = theirsMap.has(id);
+    if (inBase && !inMine) continue; // kita hapus lokal -> jangan dibalikin
+    if (inBase && !inTheirs) continue; // dihapus orang lain di server -> hormati, jangan dimunculin lagi
+    if (inMine) { result.push(mineMap.get(id)); continue; } // ada perubahan/tambahan dari kita -> menang
+    if (inTheirs) { result.push(theirsMap.get(id)); continue; } // ditambah/diubah orang lain, kita gak sentuh -> pakai punya server
+  }
+  return result;
+}
+
+// Gabungin seluruh dokumen: array-array digabung per-ID (mergeArrayByBase),
+// field non-array (profile, company, payment, logo) pakai punya kita kalau kita ubah, else punya server.
+function mergeAllData(base, mine, theirs) {
+  base = base || emptyData(); mine = mine || emptyData(); theirs = theirs || emptyData();
+  const merged = {};
+  ARRAY_MERGE_KEYS.forEach(key => {
+    merged[key] = mergeArrayByBase(base[key], mine[key], theirs[key]);
+  });
+  ['profile', 'company', 'payment', 'logo'].forEach(key => {
+    const mineChanged = JSON.stringify(mine[key]) !== JSON.stringify(base[key]);
+    merged[key] = mineChanged ? mine[key] : (theirs[key] !== undefined ? theirs[key] : mine[key]);
+  });
+  return merged;
+}
+
 let appDataCache = emptyData();
 let cloudReady = false;
 let cloudSaveTimer = null;
@@ -1581,12 +1633,14 @@ async function fetchCloudData() {
     if (snap.exists) {
       const cloud = snap.data() || {};
       appDataCache = Object.assign(emptyData(), cloud);
+      markSynced(appDataCache);
       // Kalau sttps di Firestore kosong tapi localStorage punya data,
       // ambil dari localStorage dan langsung sync ke Firestore
       if ((!cloud.sttps || cloud.sttps.length === 0)) {
         const localSttps = JSON.parse(localStorage.getItem('sttps') || '[]');
         if (localSttps.length > 0) {
           appDataCache.sttps = localSttps;
+          markSynced(appDataCache);
           cloudDocRef.set(appDataCache).catch(err => console.error('Gagal sync sttps ke cloud:', err));
         }
       }
@@ -1608,6 +1662,7 @@ async function fetchCloudData() {
         logo: localStorage.getItem('logo') || ''
       };
       appDataCache = legacy;
+      markSynced(appDataCache);
       await cloudDocRef.set(legacy);
     }
     cloudReady = true;
@@ -1815,10 +1870,23 @@ function flushCloudSave() {
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = null;
   if (!pendingCloudData || !firestoreAvailable || !cloudDocRef) return;
-  const toSave = pendingCloudData;
+  const mine = pendingCloudData;
+  const base = lastSyncedSnapshot || emptyData();
   pendingCloudData = null;
-  cloudDocRef.set(toSave).then(() => {
+
+  db.runTransaction(async (tx) => {
+    const snap = await tx.get(cloudDocRef);
+    const theirs = snap.exists ? Object.assign(emptyData(), snap.data()) : emptyData();
+    const merged = mergeAllData(base, mine, theirs);
+    tx.set(cloudDocRef, merged);
+    return merged;
+  }).then((merged) => {
     hasUnsyncedChanges = false;
+    // Ambil hasil merge sebagai kondisi terbaru (kalau ada tambahan dari device lain
+    // yang barusan ke-gabung, langsung kelihatan tanpa nunggu event onSnapshot)
+    appDataCache = merged;
+    markSynced(merged);
+    if (!isAnyModalOpen()) renderActivePage(currentPage);
   }).catch(err => {
     console.error('Gagal menyimpan ke cloud:', err);
     // Tampilkan kode error asli (bukan cuma "cek koneksi") — supaya kelihatan
@@ -3270,6 +3338,13 @@ function savePO() {
     alert('Nomor PO tidak boleh kosong. Isi sesuai nomor PO yang dibuat outlet.');
     return;
   }
+
+  const poNoValue = document.getElementById('po-no').value.trim();
+  const dupPO = data.pos.find(p => p.id !== editingPOId && (p.no || '').trim().toLowerCase() === poNoValue.toLowerCase());
+  if (dupPO) {
+    const dupOutlet = data.customers.find(c => c.id == dupPO.supplier)?.name || 'outlet lain';
+    if (!confirm(`Nomor PO "${poNoValue}" sudah dipakai di PO lain (${dupOutlet}). Tetap simpan?`)) return;
+  }
   
   if (editingPOId) {
     const po = data.pos.find(p => p.id === editingPOId);
@@ -3307,8 +3382,18 @@ function savePO() {
 function renderPOs() {
   const data = loadData();
   const tbody = document.getElementById('po-table');
-  
-  tbody.innerHTML = [...data.pos].reverse().map(po => {
+  const searchEl = document.getElementById('po-search');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+
+  let list = [...data.pos].reverse();
+  if (q) {
+    list = list.filter(po => {
+      const supplier = (data.customers.find(c => c.id == po.supplier)?.name || '').toLowerCase();
+      return (po.no || '').toLowerCase().includes(q) || supplier.includes(q) || (po.status || '').toLowerCase().includes(q);
+    });
+  }
+
+  tbody.innerHTML = list.map(po => {
     const supplier = data.customers.find(c => c.id == po.supplier)?.name || 'Unknown';
     const total = po.items.reduce((sum, item) => sum + (item.qty * item.price), 0) - (po.discount || 0);
     const badgeClass = po.status === 'Selesai' ? 'badge-green' : po.status === 'Diproses' ? 'badge-amber' : 'badge-blue';
@@ -3626,10 +3711,17 @@ function saveSO() {
 
   const poRefId = document.getElementById('so-po-ref').value || null;
   const poRef = poRefId ? data.pos.find(p => p.id == poRefId) : null;
+
+  const finalSoNo = document.getElementById('so-no').value.trim() || generateSJNumber(getCustomerNameById(document.getElementById('so-customer').value)) || generateNo('SJ');
+  const dupSO = data.sos.find(s => s.id !== editingSOId && (s.no || '').trim().toLowerCase() === finalSoNo.toLowerCase());
+  if (dupSO) {
+    const dupCust = data.customers.find(c => c.id == dupSO.customer)?.name || 'customer lain';
+    if (!confirm(`Nomor Surat Jalan "${finalSoNo}" sudah dipakai di SJ lain (${dupCust}). Tetap simpan?`)) return;
+  }
   
   if (editingSOId) {
     const so = data.sos.find(s => s.id === editingSOId);
-    so.no = document.getElementById('so-no').value || so.no;
+    so.no = finalSoNo;
     so.customer = document.getElementById('so-customer').value;
     so.date = document.getElementById('so-date').value;
     so.items = items;
@@ -3643,7 +3735,7 @@ function saveSO() {
   } else {
     const so = {
       id: Date.now(),
-      no: document.getElementById('so-no').value || generateSJNumber(getCustomerNameById(document.getElementById('so-customer').value)) || generateNo('SJ'),
+      no: finalSoNo,
       customer: document.getElementById('so-customer').value,
       date: document.getElementById('so-date').value,
       items: items,
@@ -4003,10 +4095,17 @@ function saveInv() {
 
   const soRefId = document.getElementById('inv-so-ref').value || null;
   const soRef = soRefId ? data.sos.find(s => s.id == soRefId) : null;
+
+  const finalInvNo = document.getElementById('inv-no').value.trim() || generateNo('INV');
+  const dupInv = data.invs.find(i => i.id !== editingInvId && (i.no || '').trim().toLowerCase() === finalInvNo.toLowerCase());
+  if (dupInv) {
+    const dupCust = data.customers.find(c => c.id == dupInv.customer)?.name || 'customer lain';
+    if (!confirm(`Nomor Invoice "${finalInvNo}" sudah dipakai di Invoice lain (${dupCust}). Tetap simpan?`)) return;
+  }
   
   if (editingInvId) {
     const inv = data.invs.find(i => i.id === editingInvId);
-    inv.no = document.getElementById('inv-no').value || inv.no;
+    inv.no = finalInvNo;
     inv.customer = document.getElementById('inv-customer').value;
     inv.date = document.getElementById('inv-date').value;
     inv.due = document.getElementById('inv-due').value;
@@ -4021,7 +4120,7 @@ function saveInv() {
   } else {
     const inv = {
       id: Date.now(),
-      no: document.getElementById('inv-no').value || generateNo('INV'),
+      no: finalInvNo,
       customer: document.getElementById('inv-customer').value,
       date: document.getElementById('inv-date').value,
       due: document.getElementById('inv-due').value,
@@ -5237,6 +5336,7 @@ function startRealtimeSync() {
 
     const cloud = snap.data() || {};
     appDataCache = Object.assign(emptyData(), cloud);
+    markSynced(appDataCache);
     updateStoreBranding();
 
     if (isAnyModalOpen()) {
