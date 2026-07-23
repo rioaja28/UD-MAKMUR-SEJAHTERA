@@ -186,6 +186,9 @@
   .add-item-btn { padding: 9px 14px; border: 1.5px dashed var(--purple); color: var(--purple); background: var(--purple-light); border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; margin-top: 10px; transition: background 0.15s; }
   .add-item-btn:hover { background: #E4E0FF; }
   .remove-btn { background: none; border: none; color: var(--coral); cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 6px; }
+  .row-drag-handle { cursor: grab; color: var(--text-muted); font-size: 16px; padding: 4px 6px; user-select: none; touch-action: none; }
+  .row-drag-handle:active { cursor: grabbing; }
+  .items-table tbody tr.dragging { opacity: 0.4; background: var(--purple-light); }
   .remove-btn:hover { background: var(--coral-light); }
   .total-row { display: flex; justify-content: flex-end; padding: 12px 0 4px; }
   .total-box { background: var(--purple-light); border-radius: 14px; padding: 12px 20px; text-align: right; }
@@ -1039,6 +1042,7 @@
         <table class="items-table">
           <thead>
             <tr>
+              <th style="width:24px"></th>
               <th style="width:40%">Barang</th>
               <th>Qty</th>
               <th>UOM</th>
@@ -1102,6 +1106,7 @@
         <table class="items-table">
           <thead>
             <tr>
+              <th style="width:24px"></th>
               <th>Barang</th>
               <th>Qty Masuk</th>
               <th></th>
@@ -1169,6 +1174,7 @@
         <table class="items-table">
           <thead>
             <tr>
+              <th style="width:24px"></th>
               <th>Barang</th>
               <th>Qty</th>
               <th>UOM</th>
@@ -1248,6 +1254,7 @@
         <table class="items-table">
           <thead>
             <tr>
+              <th style="width:24px"></th>
               <th>Barang</th>
               <th>Qty</th>
               <th>UOM</th>
@@ -3336,6 +3343,7 @@ function addPOItem(presetName, presetQty, presetPrice, presetUom) {
   const row = document.createElement('tr');
   row.dataset.itemId = Date.now() + Math.random();
   row.innerHTML = `
+    <td style="text-align:center;"><span class="row-drag-handle" title="Geser buat ubah urutan">⠿</span></td>
     <td style="min-width:160px">
       <div style="position: relative;">
         <input type="text" name="itemName" placeholder="Cari barang..." style="width: 100%; padding: 7px 8px;" value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}" title="${presetName || ''}" oninput="this.title=this.value">
@@ -3350,6 +3358,8 @@ function addPOItem(presetName, presetQty, presetPrice, presetUom) {
   `;
   
   tbody.appendChild(row);
+  attachRowDragHandle(row);
+  initSortableTbody('po-items');
   
   const input = row.querySelector('input[name="itemName"]');
   const dropdown = row.querySelector('.dropdown-list');
@@ -3591,6 +3601,7 @@ function addMasukItem(presetName, presetQty) {
 
   const row = document.createElement('tr');
   row.innerHTML = `
+    <td style="text-align:center;"><span class="row-drag-handle" title="Geser buat ubah urutan">⠿</span></td>
     <td>
       <div style="position: relative;">
         <input type="text" name="itemName" placeholder="Cari barang..." style="width: 100%; padding: 7px 8px;" value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}">
@@ -3602,6 +3613,8 @@ function addMasukItem(presetName, presetQty) {
   `;
 
   tbody.appendChild(row);
+  attachRowDragHandle(row);
+  initSortableTbody('masuk-items');
 
   const input = row.querySelector('input[name="itemName"]');
   const dropdown = row.querySelector('.dropdown-list');
