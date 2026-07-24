@@ -143,7 +143,6 @@
   .badge-green { background: var(--green-light); color: #1F8F5E; }
   .badge-amber { background: var(--amber-light); color: #A9660A; }
   .badge-blue { background: var(--blue-light); color: #1D7CB8; }
-  .badge-red { background: var(--coral-light); color: #E24545; }
   .action-btns { display: flex; gap: 6px; }
 
   /* Modal */
@@ -186,10 +185,6 @@
   .add-item-btn { padding: 9px 14px; border: 1.5px dashed var(--purple); color: var(--purple); background: var(--purple-light); border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 600; width: 100%; margin-top: 10px; transition: background 0.15s; }
   .add-item-btn:hover { background: #E4E0FF; }
   .remove-btn { background: none; border: none; color: var(--coral); cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 6px; }
-  .row-drag-handle { cursor: grab; color: var(--text-muted); font-size: 16px; padding: 4px 6px; user-select: none; touch-action: none; }
-  .row-drag-handle:active { cursor: grabbing; }
-  tr.dragging-row { opacity: 0.55; background: var(--purple-light) !important; box-shadow: 0 4px 10px rgba(0,0,0,0.12); }
-  .items-table tbody tr.dragging { opacity: 0.4; background: var(--purple-light); }
   .remove-btn:hover { background: var(--coral-light); }
   .total-row { display: flex; justify-content: flex-end; padding: 12px 0 4px; }
   .total-box { background: var(--purple-light); border-radius: 14px; padding: 12px 20px; text-align: right; }
@@ -305,7 +300,6 @@
   body.dark-mode .badge-green { color: #7be3ab; }
   body.dark-mode .badge-amber { color: #ffcb70; }
   body.dark-mode .badge-blue { color: #9bd4f5; }
-  body.dark-mode .badge-red { color: #ff9c92; }
   body.dark-mode .btn-success { color: #7be3ab; border-color: rgba(61,190,133,0.35); }
   body.dark-mode .btn-pdf { color: #ffcb70; border-color: rgba(245,166,35,0.35); }
   body.dark-mode .btn-danger { color: #ff9c92; border-color: rgba(255,107,107,0.35); }
@@ -352,7 +346,6 @@
 
   <div class="nav-section">Pengaturan</div>
   <div class="nav-item" onclick="switchPage('customers')">👥 Supplier/Outlet</div>
-  <div class="nav-item" onclick="switchPage('riwayat')">🕘 Riwayat Aktivitas</div>
   <div class="nav-item" onclick="switchPage('settings')">⚙️ Pengaturan</div>
 
   <div class="sidebar-footer">
@@ -472,7 +465,6 @@
       <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
         <button class="btn btn-primary" onclick="openPOModal()">+ Buat PO</button>
         <button class="btn btn-success" onclick="exportTableToExcel('po')">📤 Export Excel</button>
-        <input type="text" id="po-search" placeholder="🔍 Cari No PO / Outlet / Status..." oninput="renderPOs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -523,7 +515,6 @@
       <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
         <button class="btn btn-primary" onclick="openSOModal()">+ Buat Surat Jalan</button>
         <button class="btn btn-success" onclick="exportTableToExcel('so')">📤 Export Excel</button>
-        <input type="text" id="so-search" placeholder="🔍 Cari No SJ / Customer / Ref PO / Status..." oninput="renderSOs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -551,7 +542,6 @@
         <button class="btn btn-primary" onclick="openInvModal()">+ Buat Invoice</button>
         <button class="btn" style="background:#2E7D32;color:#fff" onclick="openPaymentModal()">💵 Catat Pembayaran Transfer</button>
         <button class="btn btn-success" onclick="exportTableToExcel('inv')">📤 Export Excel</button>
-        <input type="text" id="inv-search" placeholder="🔍 Cari No Invoice / Customer / Ref SJ / Status..." oninput="renderInvs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -622,40 +612,6 @@
             </tr>
           </thead>
           <tbody id="customer-table"></tbody>
-        </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- RIWAYAT AKTIVITAS PAGE -->
-    <div id="riwayat" class="page">
-      <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items:center;">
-        <input type="text" id="riwayat-search" placeholder="🔍 Cari modul / aksi / keterangan / user..." oninput="renderActivityLog()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
-        <select id="riwayat-module-filter" onchange="renderActivityLog()" style="padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
-          <option value="">Semua Modul</option>
-          <option value="PO">PO</option>
-          <option value="SJ">Surat Jalan</option>
-          <option value="Invoice">Invoice</option>
-          <option value="Barang Masuk">Barang Masuk</option>
-          <option value="STTP">STTP</option>
-          <option value="Customer">Customer/Outlet</option>
-          <option value="Produk">Produk</option>
-          <option value="Pembayaran">Pembayaran</option>
-        </select>
-      </div>
-      <div class="table-card">
-        <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Waktu</th>
-              <th>User</th>
-              <th>Modul</th>
-              <th>Aksi</th>
-              <th>Keterangan</th>
-            </tr>
-          </thead>
-          <tbody id="riwayat-table"></tbody>
         </table>
         </div>
       </div>
@@ -1043,7 +999,6 @@
         <table class="items-table">
           <thead>
             <tr>
-              <th style="width:24px"></th>
               <th style="width:40%">Barang</th>
               <th>Qty</th>
               <th>UOM</th>
@@ -1107,7 +1062,6 @@
         <table class="items-table">
           <thead>
             <tr>
-              <th style="width:24px"></th>
               <th>Barang</th>
               <th>Qty Masuk</th>
               <th></th>
@@ -1175,7 +1129,6 @@
         <table class="items-table">
           <thead>
             <tr>
-              <th style="width:24px"></th>
               <th>Barang</th>
               <th>Qty</th>
               <th>UOM</th>
@@ -1255,7 +1208,6 @@
         <table class="items-table">
           <thead>
             <tr>
-              <th style="width:24px"></th>
               <th>Barang</th>
               <th>Qty</th>
               <th>UOM</th>
@@ -1557,14 +1509,6 @@ let db = null;
 let cloudDocRef = null;
 let auth = null;
 let storage = null;
-// ===== DOKUMEN DIPISAH (biar dokumen utama gak numpuk kena limit 1MB Firestore) =====
-// Field yang isinya terus bertambah seiring waktu (transaksi) disimpan di dokumennya
-// masing-masing (erp/pos, erp/sos, dst), TERPISAH dari erp/main yang cuma nyimpen
-// data yang relatif tetap (produk, customer, profil toko). Kalau device masih pakai
-// data lama (semua nyatu di erp/main), fetchCloudData() otomatis migrasi begitu dibuka.
-const HEAVY_KEYS = ['pos', 'sos', 'invs', 'masuks', 'sttps', 'payments', 'activityLog'];
-const HEAVY_DOC_IDS = { pos: 'pos', sos: 'sos', invs: 'invs', masuks: 'masuks', sttps: 'sttps', payments: 'payments', activityLog: 'activitylog' };
-let heavyDocRefs = {};
 if (firestoreAvailable) {
   try {
     firebase.initializeApp(firebaseConfig);
@@ -1587,7 +1531,6 @@ if (firestoreAvailable) {
       useFetchStreams: false
     });
     cloudDocRef = db.collection('erp').doc('main');
-    HEAVY_KEYS.forEach(k => { heavyDocRefs[k] = db.collection('erp').doc(HEAVY_DOC_IDS[k]); });
     auth = firebase.auth();
     storage = firebase.storage();
     storage.setMaxUploadRetryTime(8000); // jangan retry diam-diam sampai 10 menit kalau gagal — gagal cepat & kasih tau user
@@ -1606,147 +1549,85 @@ const statuses = ['Draft', 'Confirmed', 'Completed', 'Cancelled'];
 const colors = { Draft: '#4FA8E0', Confirmed: '#6C5CE7', Completed: '#3DBE85', Cancelled: '#FF6B6B' };
 
 const emptyData = () => ({
-  products: [], customers: [], pos: [], sos: [], invs: [], masuks: [], sttps: [], payments: [], activityLog: [], profile: {}, company: {}, payment: {}, paymentAccounts: [], logo: ''
+  products: [], customers: [], pos: [], sos: [], invs: [], masuks: [], sttps: [], payments: [], profile: {}, company: {}, payment: {}, paymentAccounts: [], logo: ''
 });
-
-// ===== SAVE AMAN (biar data gak ketiban kalau lebih dari 1 orang pakai app bersamaan) =====
-// lastSyncedSnapshot = kondisi data terakhir yang KITA TAHU sama persis dengan cloud
-// (baru diambil / baru di-onSnapshot), dipakai sebagai "titik pembanding" (base) buat
-// nge-merge 3 arah: base vs punya kita (mine) vs punya server saat ini (theirs).
-let lastSyncedSnapshot = null;
-function markSynced(d) {
-  try { lastSyncedSnapshot = JSON.parse(JSON.stringify(d)); } catch (e) { lastSyncedSnapshot = d; }
-}
-
-// Field-field yang berupa array-of-object ber-ID, digabung per-item (bukan ditimpa bulat).
-const ARRAY_MERGE_KEYS = ['products', 'customers', 'pos', 'sos', 'invs', 'masuks', 'sttps', 'payments', 'paymentAccounts', 'activityLog'];
-
-function mergeArrayByBase(base, mine, theirs) {
-  base = base || []; mine = mine || []; theirs = theirs || [];
-  const baseIds = new Set(base.map(x => x.id));
-  const mineMap = new Map(mine.map(x => [x.id, x]));
-  const theirsMap = new Map(theirs.map(x => [x.id, x]));
-  const orderIds = []; // urutan: ikutin urutan `theirs` dulu, baru tambahan baru dari `mine`
-  theirs.forEach(x => orderIds.push(x.id));
-  mine.forEach(x => { if (!orderIds.includes(x.id)) orderIds.push(x.id); });
-
-  const result = [];
-  for (const id of orderIds) {
-    const inBase = baseIds.has(id);
-    const inMine = mineMap.has(id);
-    const inTheirs = theirsMap.has(id);
-    if (inBase && !inMine) continue; // kita hapus lokal -> jangan dibalikin
-    if (inBase && !inTheirs) continue; // dihapus orang lain di server -> hormati, jangan dimunculin lagi
-    if (inMine) { result.push(mineMap.get(id)); continue; } // ada perubahan/tambahan dari kita -> menang
-    if (inTheirs) { result.push(theirsMap.get(id)); continue; } // ditambah/diubah orang lain, kita gak sentuh -> pakai punya server
-  }
-  return result;
-}
-
-// Gabungin seluruh dokumen: array-array digabung per-ID (mergeArrayByBase),
-// field non-array (profile, company, payment, logo) pakai punya kita kalau kita ubah, else punya server.
-function mergeAllData(base, mine, theirs) {
-  base = base || emptyData(); mine = mine || emptyData(); theirs = theirs || emptyData();
-  const merged = {};
-  ARRAY_MERGE_KEYS.forEach(key => {
-    merged[key] = mergeArrayByBase(base[key], mine[key], theirs[key]);
-  });
-  ['profile', 'company', 'payment', 'logo'].forEach(key => {
-    const mineChanged = JSON.stringify(mine[key]) !== JSON.stringify(base[key]);
-    merged[key] = mineChanged ? mine[key] : (theirs[key] !== undefined ? theirs[key] : mine[key]);
-  });
-  return merged;
-}
 
 let appDataCache = emptyData();
 let cloudReady = false;
 let cloudSaveTimer = null;
 
-function loadAllFromLocalStorage() {
-  return {
-    products: JSON.parse(localStorage.getItem('products') || '[]'),
-    customers: JSON.parse(localStorage.getItem('customers') || '[]'),
-    pos: JSON.parse(localStorage.getItem('pos') || '[]'),
-    sos: JSON.parse(localStorage.getItem('sos') || '[]'),
-    invs: JSON.parse(localStorage.getItem('invs') || '[]'),
-    masuks: JSON.parse(localStorage.getItem('masuks') || '[]'),
-    sttps: JSON.parse(localStorage.getItem('sttps') || '[]'),
-    payments: JSON.parse(localStorage.getItem('payments') || '[]'),
-    activityLog: JSON.parse(localStorage.getItem('activityLog') || '[]'),
-    profile: JSON.parse(localStorage.getItem('profile') || '{}'),
-    company: JSON.parse(localStorage.getItem('company') || '{}'),
-    payment: JSON.parse(localStorage.getItem('payment') || '{}'),
-    paymentAccounts: JSON.parse(localStorage.getItem('paymentAccounts') || '[]'),
-    logo: localStorage.getItem('logo') || ''
-  };
-}
-
-// Tulis data ke SEMUA dokumen sekaligus (main + tiap heavy doc) dalam satu batch —
-// dipakai saat migrasi awal / pertama kali split dokumen.
-async function writeAllDocs(d) {
-  const mainData = Object.assign({}, d);
-  HEAVY_KEYS.forEach(k => delete mainData[k]);
-  const batch = db.batch();
-  batch.set(cloudDocRef, mainData);
-  HEAVY_KEYS.forEach(k => batch.set(heavyDocRefs[k], { [k]: d[k] || [] }));
-  await batch.commit();
-}
-
 // Ambil data dari Firestore sekali di awal, sebelum app ditampilkan
 async function fetchCloudData() {
   if (!firestoreAvailable) {
-    appDataCache = loadAllFromLocalStorage();
+    appDataCache = {
+      products: JSON.parse(localStorage.getItem('products') || '[]'),
+      customers: JSON.parse(localStorage.getItem('customers') || '[]'),
+      pos: JSON.parse(localStorage.getItem('pos') || '[]'),
+      sos: JSON.parse(localStorage.getItem('sos') || '[]'),
+      invs: JSON.parse(localStorage.getItem('invs') || '[]'),
+      masuks: JSON.parse(localStorage.getItem('masuks') || '[]'),
+      sttps: JSON.parse(localStorage.getItem('sttps') || '[]'),
+      payments: JSON.parse(localStorage.getItem('payments') || '[]'),
+      profile: JSON.parse(localStorage.getItem('profile') || '{}'),
+      company: JSON.parse(localStorage.getItem('company') || '{}'),
+      payment: JSON.parse(localStorage.getItem('payment') || '{}'),
+      paymentAccounts: JSON.parse(localStorage.getItem('paymentAccounts') || '[]'),
+      logo: localStorage.getItem('logo') || ''
+    };
     return;
   }
   try {
-    const [mainSnap, ...heavySnaps] = await Promise.all([
-      cloudDocRef.get(),
-      ...HEAVY_KEYS.map(k => heavyDocRefs[k].get())
-    ]);
-    const mainExists = mainSnap.exists;
-    const anyHeavyExists = heavySnaps.some(s => s.exists);
-
-    if (!mainExists && !anyHeavyExists) {
-      // Belum ada data di cloud sama sekali — coba migrasi dari localStorage (device lama)
-      const legacy = loadAllFromLocalStorage();
-      appDataCache = legacy;
-      markSynced(appDataCache);
-      await writeAllDocs(legacy);
-    } else {
-      const mainData = mainExists ? (mainSnap.data() || {}) : {};
-      appDataCache = Object.assign(emptyData(), mainData);
-      let needMigrateHeavy = false;
-      HEAVY_KEYS.forEach((k, i) => {
-        const snap = heavySnaps[i];
-        if (snap.exists) {
-          appDataCache[k] = (snap.data() || {})[k] || [];
-        } else if (Array.isArray(mainData[k]) && mainData[k].length > 0) {
-          // Data lama masih nyempil di dokumen 'main' (format sebelum di-split) -> pindahin
-          appDataCache[k] = mainData[k];
-          needMigrateHeavy = true;
-        } else {
-          appDataCache[k] = [];
-        }
-      });
-      markSynced(appDataCache);
+    const snap = await cloudDocRef.get();
+    if (snap.exists) {
+      const cloud = snap.data() || {};
+      appDataCache = Object.assign(emptyData(), cloud);
       // Kalau sttps di Firestore kosong tapi localStorage punya data,
       // ambil dari localStorage dan langsung sync ke Firestore
-      if (!appDataCache.sttps || appDataCache.sttps.length === 0) {
+      if ((!cloud.sttps || cloud.sttps.length === 0)) {
         const localSttps = JSON.parse(localStorage.getItem('sttps') || '[]');
         if (localSttps.length > 0) {
           appDataCache.sttps = localSttps;
-          markSynced(appDataCache);
-          needMigrateHeavy = true;
+          cloudDocRef.set(appDataCache).catch(err => console.error('Gagal sync sttps ke cloud:', err));
         }
       }
-      if (needMigrateHeavy) {
-        await writeAllDocs(appDataCache).catch(err => console.error('Gagal migrasi dokumen terpisah:', err));
-      }
+    } else {
+      // Belum ada data di cloud — coba migrasi dari localStorage (kalau ada data lama di device ini)
+      const legacy = {
+        products: JSON.parse(localStorage.getItem('products') || '[]'),
+        customers: JSON.parse(localStorage.getItem('customers') || '[]'),
+        pos: JSON.parse(localStorage.getItem('pos') || '[]'),
+        sos: JSON.parse(localStorage.getItem('sos') || '[]'),
+        invs: JSON.parse(localStorage.getItem('invs') || '[]'),
+        masuks: JSON.parse(localStorage.getItem('masuks') || '[]'),
+        sttps: JSON.parse(localStorage.getItem('sttps') || '[]'),
+        payments: JSON.parse(localStorage.getItem('payments') || '[]'),
+        profile: JSON.parse(localStorage.getItem('profile') || '{}'),
+        company: JSON.parse(localStorage.getItem('company') || '{}'),
+        payment: JSON.parse(localStorage.getItem('payment') || '{}'),
+        paymentAccounts: JSON.parse(localStorage.getItem('paymentAccounts') || '[]'),
+        logo: localStorage.getItem('logo') || ''
+      };
+      appDataCache = legacy;
+      await cloudDocRef.set(legacy);
     }
     cloudReady = true;
   } catch (err) {
     console.error('Gagal mengambil data dari cloud, pakai data lokal sebagai cadangan:', err);
-    appDataCache = loadAllFromLocalStorage();
+    appDataCache = {
+      products: JSON.parse(localStorage.getItem('products') || '[]'),
+      customers: JSON.parse(localStorage.getItem('customers') || '[]'),
+      pos: JSON.parse(localStorage.getItem('pos') || '[]'),
+      sos: JSON.parse(localStorage.getItem('sos') || '[]'),
+      invs: JSON.parse(localStorage.getItem('invs') || '[]'),
+      masuks: JSON.parse(localStorage.getItem('masuks') || '[]'),
+      sttps: JSON.parse(localStorage.getItem('sttps') || '[]'),
+      payments: JSON.parse(localStorage.getItem('payments') || '[]'),
+      profile: JSON.parse(localStorage.getItem('profile') || '{}'),
+      company: JSON.parse(localStorage.getItem('company') || '{}'),
+      payment: JSON.parse(localStorage.getItem('payment') || '{}'),
+      paymentAccounts: JSON.parse(localStorage.getItem('paymentAccounts') || '[]'),
+      logo: localStorage.getItem('logo') || ''
+    };
     cloudReady = false;
   }
 }
@@ -1832,66 +1713,6 @@ let undoHistory = [];
 let redoHistory = [];
 const MAX_UNDO_HISTORY = 25;
 
-// ===== RIWAYAT AKTIVITAS (audit trail) =====
-// Catetan ringan siapa-ngapain-kapan. Dipanggil dari dalam fungsi save/delete
-// SEBELUM saveData(data), jadi entri log-nya ikut kesimpen dalam transaksi yang sama.
-// Disimpan cuma 300 entri terakhir biar dokumennya sendiri gak ikut numpuk.
-const MAX_ACTIVITY_LOG = 300;
-function logActivity(data, module, action, description) {
-  if (!data.activityLog) data.activityLog = [];
-  const who = (typeof auth !== 'undefined' && auth && auth.currentUser && auth.currentUser.email) || 'Tidak diketahui';
-  data.activityLog.push({
-    id: Date.now() + Math.random(),
-    time: new Date().toISOString(),
-    user: who,
-    module,
-    action,
-    description
-  });
-  if (data.activityLog.length > MAX_ACTIVITY_LOG) {
-    data.activityLog = data.activityLog.slice(-MAX_ACTIVITY_LOG);
-  }
-}
-
-function renderActivityLog() {
-  const data = loadData();
-  const tbody = document.getElementById('riwayat-table');
-  if (!tbody) return;
-  const searchEl = document.getElementById('riwayat-search');
-  const moduleEl = document.getElementById('riwayat-module-filter');
-  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
-  const moduleFilter = moduleEl ? moduleEl.value : '';
-
-  let list = [...(data.activityLog || [])].reverse();
-  if (moduleFilter) list = list.filter(l => l.module === moduleFilter);
-  if (q) {
-    list = list.filter(l =>
-      (l.module || '').toLowerCase().includes(q) ||
-      (l.action || '').toLowerCase().includes(q) ||
-      (l.description || '').toLowerCase().includes(q) ||
-      (l.user || '').toLowerCase().includes(q)
-    );
-  }
-
-  if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:24px;">Belum ada riwayat aktivitas.</td></tr>`;
-    return;
-  }
-
-  const actionBadge = { 'Tambah': 'badge-green', 'Edit': 'badge-blue', 'Hapus': 'badge-red' };
-  tbody.innerHTML = list.map(l => {
-    const d = new Date(l.time);
-    const waktu = isNaN(d) ? '-' : d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    return `<tr>
-      <td>${waktu}</td>
-      <td>${l.user || '-'}</td>
-      <td>${l.module || '-'}</td>
-      <td><span class="badge ${actionBadge[l.action] || 'badge-blue'}">${l.action || '-'}</span></td>
-      <td>${l.description || '-'}</td>
-    </tr>`;
-  }).join('');
-}
-
 function saveData(data) {
   // Rekam snapshot SEBELUM perubahan buat undo, lalu bersihin redo
   if (appDataCache) {
@@ -1918,7 +1739,6 @@ function persistData(data) {
     localStorage.setItem('masuks', JSON.stringify(data.masuks));
     localStorage.setItem('sttps', JSON.stringify(data.sttps || []));
     localStorage.setItem('payments', JSON.stringify(data.payments || []));
-    localStorage.setItem('activityLog', JSON.stringify(data.activityLog || []));
     localStorage.setItem('profile', JSON.stringify(data.profile));
     localStorage.setItem('company', JSON.stringify(data.company));
     localStorage.setItem('payment', JSON.stringify(data.payment || {}));
@@ -1995,35 +1815,10 @@ function flushCloudSave() {
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = null;
   if (!pendingCloudData || !firestoreAvailable || !cloudDocRef) return;
-  const mine = pendingCloudData;
-  const base = lastSyncedSnapshot || emptyData();
+  const toSave = pendingCloudData;
   pendingCloudData = null;
-
-  db.runTransaction(async (tx) => {
-    const mainSnap = await tx.get(cloudDocRef);
-    const heavySnaps = {};
-    for (const k of HEAVY_KEYS) heavySnaps[k] = await tx.get(heavyDocRefs[k]);
-
-    const theirs = Object.assign(emptyData(), mainSnap.exists ? (mainSnap.data() || {}) : {});
-    HEAVY_KEYS.forEach(k => {
-      theirs[k] = heavySnaps[k].exists ? ((heavySnaps[k].data() || {})[k] || []) : [];
-    });
-
-    const merged = mergeAllData(base, mine, theirs);
-
-    const mainData = Object.assign({}, merged);
-    HEAVY_KEYS.forEach(k => delete mainData[k]);
-    tx.set(cloudDocRef, mainData);
-    HEAVY_KEYS.forEach(k => tx.set(heavyDocRefs[k], { [k]: merged[k] || [] }));
-
-    return merged;
-  }).then((merged) => {
+  cloudDocRef.set(toSave).then(() => {
     hasUnsyncedChanges = false;
-    // Ambil hasil merge sebagai kondisi terbaru (kalau ada tambahan dari device lain
-    // yang barusan ke-gabung, langsung kelihatan tanpa nunggu event onSnapshot)
-    appDataCache = merged;
-    markSynced(merged);
-    if (!isAnyModalOpen()) renderActivePage(currentPage);
   }).catch(err => {
     console.error('Gagal menyimpan ke cloud:', err);
     // Tampilkan kode error asli (bukan cuma "cek koneksi") — supaya kelihatan
@@ -2610,7 +2405,6 @@ function addProduct() {
   }
   
   data.products.push(product);
-  logActivity(data, 'Produk', 'Tambah', `Menambah produk ${product.name}`);
   saveData(data);
   if (imageData) saveProductImage(id, imageData);
   closeModal('productModal');
@@ -2642,7 +2436,6 @@ function updateProduct(id) {
     outletPrices: collectOutletPrices()
   };
   delete data.products[idx].image; // gambar lama (kalau ada) pindah ke dokumen terpisah lewat saveProductImage
-  logActivity(data, 'Produk', 'Edit', `Mengubah data produk ${name}`);
   
   saveData(data);
   saveProductImage(id, imageData);
@@ -2757,7 +2550,6 @@ function deleteProduct(id) {
     const removed = data.products[idx];
     const removedImage = getProductImage(removed);
     data.products = data.products.filter(p => p.id !== id);
-    logActivity(data, 'Produk', 'Hapus', `Menghapus produk ${removed.name}`);
     saveData(data);
     deleteProductImage(id);
     renderProducts();
@@ -2812,7 +2604,6 @@ function addCustomer() {
   }
   
   data.customers.push(customer);
-  logActivity(data, 'Customer', 'Tambah', `Menambah ${customer.type === 'supplier' ? 'supplier' : 'outlet'} ${customer.name}`);
   saveData(data);
   closeModal('customerModal');
   renderCustomers();
@@ -2858,7 +2649,6 @@ function updateCustomer(id) {
     showRekeningSJ: document.getElementById('customer-show-rekening').checked,
     defaultPaymentAccountId: document.getElementById('customer-default-payment').value || null
   };
-  logActivity(data, 'Customer', 'Edit', `Mengubah data ${name}`);
   saveData(data);
   closeModal('customerModal');
   renderCustomers();
@@ -2894,7 +2684,6 @@ function deleteCustomer(id) {
     if (idx === -1) return;
     const removed = data.customers[idx];
     data.customers = data.customers.filter(c => c.id !== id);
-    logActivity(data, 'Customer', 'Hapus', `Menghapus ${removed.name}`);
     saveData(data);
     renderCustomers();
     showUndoToast(`"${removed.name}" dihapus.`, () => {
@@ -3334,59 +3123,6 @@ function selectItem(id, name, uom, price) {
   }
 }
 
-// ===== GESER URUTAN ITEM (drag-to-reorder pakai kursor/jari, tanpa tombol panah) =====
-// initSortableTbody dipanggil tiap nambah baris baru, tapi listener-nya cuma
-// dipasang SEKALI per tbody (delegasi event) — jadi baris yang ditambah belakangan
-// otomatis ikut bisa digeser tanpa perlu daftar ulang.
-const _sortableTbodyReady = new Set();
-function initSortableTbody(tbodyId) {
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody || _sortableTbodyReady.has(tbodyId)) return;
-  _sortableTbodyReady.add(tbodyId);
-
-  let draggingRow = null;
-
-  tbody.addEventListener('pointerdown', (e) => {
-    const handle = e.target.closest('.row-drag-handle');
-    if (!handle) return;
-    const row = handle.closest('tr');
-    if (!row || row.parentNode !== tbody) return;
-    e.preventDefault();
-
-    draggingRow = row;
-    row.classList.add('dragging-row');
-    document.body.style.userSelect = 'none';
-
-    const onMove = (ev) => {
-      if (!draggingRow) return;
-      const y = ev.clientY;
-      const siblings = Array.from(tbody.children).filter(r => r !== draggingRow);
-      let target = null;
-      for (const r of siblings) {
-        const rect = r.getBoundingClientRect();
-        if (y < rect.top + rect.height / 2) { target = r; break; }
-      }
-      if (target) tbody.insertBefore(draggingRow, target);
-      else tbody.appendChild(draggingRow);
-    };
-
-    const onUp = () => {
-      if (draggingRow) draggingRow.classList.remove('dragging-row');
-      draggingRow = null;
-      document.body.style.userSelect = '';
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-    };
-
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-  }, { passive: false });
-}
-
-// Dipertahankan biar pemanggilan lama (per-baris) tetap aman — logikanya sekarang
-// dipusatkan di initSortableTbody() lewat delegasi event di atas.
-function attachRowDragHandle(row) {}
-
 // ===== PO FUNCTIONS =====
 let editingPOId = null;
 
@@ -3397,7 +3133,6 @@ function addPOItem(presetName, presetQty, presetPrice, presetUom) {
   const row = document.createElement('tr');
   row.dataset.itemId = Date.now() + Math.random();
   row.innerHTML = `
-    <td style="text-align:center;"><span class="row-drag-handle" title="Geser buat ubah urutan">⠿</span></td>
     <td style="min-width:160px">
       <div style="position: relative;">
         <input type="text" name="itemName" placeholder="Cari barang..." style="width: 100%; padding: 7px 8px;" value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}" title="${presetName || ''}" oninput="this.title=this.value">
@@ -3412,8 +3147,6 @@ function addPOItem(presetName, presetQty, presetPrice, presetUom) {
   `;
   
   tbody.appendChild(row);
-  attachRowDragHandle(row);
-  initSortableTbody('po-items');
   
   const input = row.querySelector('input[name="itemName"]');
   const dropdown = row.querySelector('.dropdown-list');
@@ -3537,13 +3270,6 @@ function savePO() {
     alert('Nomor PO tidak boleh kosong. Isi sesuai nomor PO yang dibuat outlet.');
     return;
   }
-
-  const poNoValue = document.getElementById('po-no').value.trim();
-  const dupPO = data.pos.find(p => p.id !== editingPOId && (p.no || '').trim().toLowerCase() === poNoValue.toLowerCase());
-  if (dupPO) {
-    const dupOutlet = data.customers.find(c => c.id == dupPO.supplier)?.name || 'outlet lain';
-    if (!confirm(`Nomor PO "${poNoValue}" sudah dipakai di PO lain (${dupOutlet}). Tetap simpan?`)) return;
-  }
   
   if (editingPOId) {
     const po = data.pos.find(p => p.id === editingPOId);
@@ -3555,7 +3281,6 @@ function savePO() {
     po.notes = document.getElementById('po-notes').value;
     po.discount = parseFloat(document.getElementById('po-discount').value) || 0;
     po.status = document.getElementById('po-status').value;
-    logActivity(data, 'PO', 'Edit', `Merevisi PO ${po.no}`);
     showToast('PO berhasil direvisi!');
   } else {
     const po = {
@@ -3570,7 +3295,6 @@ function savePO() {
       status: document.getElementById('po-status').value || 'Draft'
     };
     data.pos.push(po);
-    logActivity(data, 'PO', 'Tambah', `Membuat PO ${po.no}`);
     showToast('PO berhasil disimpan!');
   }
   
@@ -3583,18 +3307,8 @@ function savePO() {
 function renderPOs() {
   const data = loadData();
   const tbody = document.getElementById('po-table');
-  const searchEl = document.getElementById('po-search');
-  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
-
-  let list = [...data.pos].reverse();
-  if (q) {
-    list = list.filter(po => {
-      const supplier = (data.customers.find(c => c.id == po.supplier)?.name || '').toLowerCase();
-      return (po.no || '').toLowerCase().includes(q) || supplier.includes(q) || (po.status || '').toLowerCase().includes(q);
-    });
-  }
-
-  tbody.innerHTML = list.map(po => {
+  
+  tbody.innerHTML = [...data.pos].reverse().map(po => {
     const supplier = data.customers.find(c => c.id == po.supplier)?.name || 'Unknown';
     const total = po.items.reduce((sum, item) => sum + (item.qty * item.price), 0) - (po.discount || 0);
     const badgeClass = po.status === 'Selesai' ? 'badge-green' : po.status === 'Diproses' ? 'badge-amber' : 'badge-blue';
@@ -3621,7 +3335,6 @@ function deletePO(id) {
     if (idx === -1) return;
     const removed = data.pos[idx];
     data.pos = data.pos.filter(po => po.id !== id);
-    logActivity(data, 'PO', 'Hapus', `Menghapus PO ${removed.no}`);
     saveData(data);
     renderPOs();
     showUndoToast(`PO "${removed.no}" dihapus.`, () => {
@@ -3655,7 +3368,6 @@ function addMasukItem(presetName, presetQty) {
 
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td style="text-align:center;"><span class="row-drag-handle" title="Geser buat ubah urutan">⠿</span></td>
     <td>
       <div style="position: relative;">
         <input type="text" name="itemName" placeholder="Cari barang..." style="width: 100%; padding: 7px 8px;" value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}">
@@ -3667,8 +3379,6 @@ function addMasukItem(presetName, presetQty) {
   `;
 
   tbody.appendChild(row);
-  attachRowDragHandle(row);
-  initSortableTbody('masuk-items');
 
   const input = row.querySelector('input[name="itemName"]');
   const dropdown = row.querySelector('.dropdown-list');
@@ -3720,7 +3430,6 @@ function saveMasuk() {
   };
 
   data.masuks.push(masuk);
-  logActivity(data, 'Barang Masuk', 'Tambah', `Mencatat barang masuk ${masuk.ref || masuk.id}`);
 
   // Update stock produk
   data.products.forEach(product => {
@@ -3765,7 +3474,6 @@ function deleteMasuk(id) {
     if (idx === -1) return;
     const removed = data.masuks[idx];
     data.masuks = data.masuks.filter(m => m.id !== id);
-    logActivity(data, 'Barang Masuk', 'Hapus', `Menghapus data barang masuk ${removed.ref || removed.id}`);
     saveData(data);
     renderMasuk();
     showUndoToast('Data barang masuk dihapus.', () => {
@@ -3918,17 +3626,10 @@ function saveSO() {
 
   const poRefId = document.getElementById('so-po-ref').value || null;
   const poRef = poRefId ? data.pos.find(p => p.id == poRefId) : null;
-
-  const finalSoNo = document.getElementById('so-no').value.trim() || generateSJNumber(getCustomerNameById(document.getElementById('so-customer').value)) || generateNo('SJ');
-  const dupSO = data.sos.find(s => s.id !== editingSOId && (s.no || '').trim().toLowerCase() === finalSoNo.toLowerCase());
-  if (dupSO) {
-    const dupCust = data.customers.find(c => c.id == dupSO.customer)?.name || 'customer lain';
-    if (!confirm(`Nomor Surat Jalan "${finalSoNo}" sudah dipakai di SJ lain (${dupCust}). Tetap simpan?`)) return;
-  }
   
   if (editingSOId) {
     const so = data.sos.find(s => s.id === editingSOId);
-    so.no = finalSoNo;
+    so.no = document.getElementById('so-no').value || so.no;
     so.customer = document.getElementById('so-customer').value;
     so.date = document.getElementById('so-date').value;
     so.items = items;
@@ -3938,12 +3639,11 @@ function saveSO() {
     so.paymentAccountId = document.getElementById('so-payment-account').value || null;
     so.poId = poRefId;
     so.poNo = poRef ? poRef.no : (so.poNo || null);
-    logActivity(data, 'SJ', 'Edit', `Merevisi Surat Jalan ${so.no}`);
     showToast('Surat Jalan berhasil direvisi!');
   } else {
     const so = {
       id: Date.now(),
-      no: finalSoNo,
+      no: document.getElementById('so-no').value || generateSJNumber(getCustomerNameById(document.getElementById('so-customer').value)) || generateNo('SJ'),
       customer: document.getElementById('so-customer').value,
       date: document.getElementById('so-date').value,
       items: items,
@@ -3955,7 +3655,6 @@ function saveSO() {
       poNo: poRef ? poRef.no : null
     };
     data.sos.push(so);
-    logActivity(data, 'SJ', 'Tambah', `Membuat Surat Jalan ${so.no}`);
     showToast('Surat Jalan berhasil disimpan!');
   }
 
@@ -3974,19 +3673,8 @@ function saveSO() {
 function renderSOs() {
   const data = loadData();
   const tbody = document.getElementById('so-table');
-  const searchEl = document.getElementById('so-search');
-  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
-
-  let list = [...data.sos].reverse();
-  if (q) {
-    list = list.filter(so => {
-      const customer = (data.customers.find(c => c.id == so.customer)?.name || '').toLowerCase();
-      return (so.no || '').toLowerCase().includes(q) || customer.includes(q) ||
-        (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q);
-    });
-  }
-
-  tbody.innerHTML = list.map(so => {
+  
+  tbody.innerHTML = [...data.sos].reverse().map(so => {
     const customer = data.customers.find(c => c.id == so.customer)?.name || 'Unknown';
     const badgeClass = so.status === 'Selesai' ? 'badge-green' : 'badge-blue';
     const photoCount = (so.photos || []).length;
@@ -4019,7 +3707,6 @@ function deleteSO(id) {
     const removed = data.sos[idx];
     // ✅ Foto sudah disimpan di Firestore (base64), tidak perlu hapus dari Storage
     data.sos = data.sos.filter(so => so.id !== id);
-    logActivity(data, 'SJ', 'Hapus', `Menghapus Surat Jalan ${removed.no}`);
     saveData(data);
     renderSOs();
     showUndoToast(`Surat Jalan "${removed.no}" dihapus.`, () => {
@@ -4316,17 +4003,10 @@ function saveInv() {
 
   const soRefId = document.getElementById('inv-so-ref').value || null;
   const soRef = soRefId ? data.sos.find(s => s.id == soRefId) : null;
-
-  const finalInvNo = document.getElementById('inv-no').value.trim() || generateNo('INV');
-  const dupInv = data.invs.find(i => i.id !== editingInvId && (i.no || '').trim().toLowerCase() === finalInvNo.toLowerCase());
-  if (dupInv) {
-    const dupCust = data.customers.find(c => c.id == dupInv.customer)?.name || 'customer lain';
-    if (!confirm(`Nomor Invoice "${finalInvNo}" sudah dipakai di Invoice lain (${dupCust}). Tetap simpan?`)) return;
-  }
   
   if (editingInvId) {
     const inv = data.invs.find(i => i.id === editingInvId);
-    inv.no = finalInvNo;
+    inv.no = document.getElementById('inv-no').value || inv.no;
     inv.customer = document.getElementById('inv-customer').value;
     inv.date = document.getElementById('inv-date').value;
     inv.due = document.getElementById('inv-due').value;
@@ -4337,12 +4017,11 @@ function saveInv() {
     inv.paymentAccountId = document.getElementById('inv-payment-account').value || null;
     inv.soId = soRefId;
     inv.soNo = soRef ? soRef.no : (inv.soNo || null);
-    logActivity(data, 'Invoice', 'Edit', `Merevisi Invoice ${inv.no}`);
     showToast('Invoice berhasil direvisi!');
   } else {
     const inv = {
       id: Date.now(),
-      no: finalInvNo,
+      no: document.getElementById('inv-no').value || generateNo('INV'),
       customer: document.getElementById('inv-customer').value,
       date: document.getElementById('inv-date').value,
       due: document.getElementById('inv-due').value,
@@ -4355,7 +4034,6 @@ function saveInv() {
       soNo: soRef ? soRef.no : null
     };
     data.invs.push(inv);
-    logActivity(data, 'Invoice', 'Tambah', `Membuat Invoice ${inv.no}`);
     showToast('Invoice berhasil disimpan!');
   }
 
@@ -4389,19 +4067,7 @@ function renderInvs() {
     invNos.forEach(no => sentInvNos.add(no));
   });
 
-  const searchEl = document.getElementById('inv-search');
-  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
-
-  let list = [...data.invs].reverse();
-  if (q) {
-    list = list.filter(inv => {
-      const customer = (data.customers.find(c => c.id == inv.customer)?.name || '').toLowerCase();
-      return (inv.no || '').toLowerCase().includes(q) || customer.includes(q) ||
-        (inv.soNo || '').toLowerCase().includes(q) || (inv.status || '').toLowerCase().includes(q);
-    });
-  }
-
-  tbody.innerHTML = list.map(inv => {
+  tbody.innerHTML = [...data.invs].reverse().map(inv => {
     const customer = data.customers.find(c => c.id == inv.customer)?.name || 'Unknown';
     const total = inv.items.reduce((sum, item) => sum + (item.qty * item.price), 0) - (inv.discount || 0);
     const isLunas = inv.status === 'Lunas';
@@ -4616,7 +4282,6 @@ function savePaymentBatch() {
   });
 
   autoSyncSttpLunasStatus(data);
-  logActivity(data, 'Pembayaran', 'Tambah', `Mencatat transfer ${rupiah(amount)} untuk ${invNos.length} invoice (${invNos.join(', ')})`);
   saveData(data);
   closeModal('paymentBatchModal');
   renderInvs();
@@ -4669,7 +4334,6 @@ function deletePaymentRecord(id) {
   if (idx === -1) return;
   const removed = data.payments[idx];
   data.payments = data.payments.filter(p => p.id !== id);
-  logActivity(data, 'Pembayaran', 'Hapus', `Menghapus riwayat pembayaran ${rupiah(removed.amount)}`);
   saveData(data);
   renderPaymentHistory();
   showUndoToast('Riwayat pembayaran dihapus.', () => {
@@ -4689,7 +4353,6 @@ function deleteInv(id) {
     if (idx === -1) return;
     const removed = data.invs[idx];
     data.invs = data.invs.filter(inv => inv.id !== id);
-    logActivity(data, 'Invoice', 'Hapus', `Menghapus Invoice ${removed.no}`);
     saveData(data);
     renderInvs();
     showUndoToast(`Invoice "${removed.no}" dihapus.`, () => {
@@ -5518,8 +5181,6 @@ function renderActivePage(pageName) {
     initRekapPage();
   } else if (pageName === 'sttp') {
     renderSttps();
-  } else if (pageName === 'riwayat') {
-    renderActivityLog();
   } else if (pageName === 'profile') {
     const data = loadData();
     document.getElementById('profileName').value = data.profile?.name || '';
@@ -5545,8 +5206,7 @@ function switchPage(pageName) {
     settings: '⚙️ Pengaturan',
     profile: '👤 Profil',
     rekap: '📅 Rekap Pengiriman',
-    sttp: '🧾 Tanda Terima Dokumen',
-    riwayat: '🕘 Riwayat Aktivitas'
+    sttp: '🧾 Tanda Terima Dokumen'
   };
   
   document.getElementById('pageTitle').textContent = titles[pageName] || 'Dashboard';
@@ -5560,7 +5220,7 @@ function switchPage(pageName) {
 // data baru (PO/SJ/Invoice/dll), device ini otomatis ke-refresh tanpa perlu
 // klik refresh manual. Kalau lagi ada modal kebuka (user lagi ngisi form),
 // auto-refresh DITUNDA dulu biar isian yang lagi diketik ga ke-reset/ilang.
-let realtimeUnsubs = [];
+let realtimeUnsub = null;
 let pendingRealtimeUpdate = false;
 
 function isAnyModalOpen() {
@@ -5568,11 +5228,17 @@ function isAnyModalOpen() {
 }
 
 function startRealtimeSync() {
-  if (!firestoreAvailable || !cloudDocRef || realtimeUnsubs.length) return;
+  if (!firestoreAvailable || !cloudDocRef || realtimeUnsub) return;
+  realtimeUnsub = cloudDocRef.onSnapshot(snap => {
+    // Lewatin update dari write kita sendiri yang belum ke-confirm server,
+    // biar ga dobel-render pas kita baru aja nyimpen sesuatu.
+    if (snap.metadata.hasPendingWrites) return;
+    if (!snap.exists) return;
 
-  const handleUpdate = () => {
-    markSynced(appDataCache);
+    const cloud = snap.data() || {};
+    appDataCache = Object.assign(emptyData(), cloud);
     updateStoreBranding();
+
     if (isAnyModalOpen()) {
       // Tunda render sampai modal ditutup, biar form yang lagi diisi ga keganggu
       pendingRealtimeUpdate = true;
@@ -5580,25 +5246,8 @@ function startRealtimeSync() {
     }
     renderActivePage(currentPage);
     showSyncIndicator();
-  };
-
-  realtimeUnsubs.push(cloudDocRef.onSnapshot(snap => {
-    // Lewatin update dari write kita sendiri yang belum ke-confirm server,
-    // biar ga dobel-render pas kita baru aja nyimpen sesuatu.
-    if (snap.metadata.hasPendingWrites) return;
-    if (!snap.exists) return;
-    const cloud = snap.data() || {};
-    Object.keys(cloud).forEach(k => { if (!HEAVY_KEYS.includes(k)) appDataCache[k] = cloud[k]; });
-    handleUpdate();
-  }, err => console.error('Realtime sync error (main):', err)));
-
-  HEAVY_KEYS.forEach(k => {
-    realtimeUnsubs.push(heavyDocRefs[k].onSnapshot(snap => {
-      if (snap.metadata.hasPendingWrites) return;
-      if (!snap.exists) return;
-      appDataCache[k] = (snap.data() || {})[k] || [];
-      handleUpdate();
-    }, err => console.error(`Realtime sync error (${k}):`, err)));
+  }, err => {
+    console.error('Realtime sync error:', err);
   });
 }
 
@@ -6201,10 +5850,8 @@ function saveSttp() {
   if (editId) {
     const idx = data.sttps.findIndex(s => s.id === editId);
     if (idx >= 0) data.sttps[idx] = sttp; else data.sttps.push(sttp);
-    logActivity(data, 'STTP', 'Edit', `Merevisi Tanda Terima ${sttp.no}`);
   } else {
     data.sttps.push(sttp);
-    logActivity(data, 'STTP', 'Tambah', `Membuat Tanda Terima ${sttp.no}`);
   }
   saveData(data);
   renderSttps();
@@ -6220,7 +5867,6 @@ function deleteSttp(id) {
   if (idx === -1) return;
   const removed = data.sttps[idx];
   data.sttps = data.sttps.filter(s => s.id !== id);
-  logActivity(data, 'STTP', 'Hapus', `Menghapus Tanda Terima ${removed.no}`);
   saveData(data);
   renderSttps();
   showUndoToast(`Tanda Terima "${removed.no}" dihapus.`, () => {
