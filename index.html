@@ -5332,7 +5332,7 @@ function drpFooterText() {
 }
 
 // Klik pertama = set tanggal mulai lalu mulai "mengikuti" kursor (tanpa perlu tahan mouse)
-// Klik kedua = kunci tanggal akhir -> langsung terapkan ke filter
+// Klik kedua = kunci tanggal akhir (popup TETAP terbuka, nunggu user klik tombol Terapkan)
 function drpDayClick(e) {
   e.stopPropagation();
   const iso = this.getAttribute('data-date');
@@ -5340,7 +5340,6 @@ function drpDayClick(e) {
     drpState.draftEnd = iso;
     drpState.picking = false;
     drpUpdateHighlight();
-    applyDateRangePicker();
   } else {
     drpState.draftStart = iso;
     drpState.draftEnd = iso;
