@@ -1426,7 +1426,7 @@
         <input type="text" id="outlet-history-search" placeholder="🔍 Cari nama produk..." oninput="renderOutletHistory(document.getElementById('outlet-history-customer-id').value)">
       </div>
       <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
-        Daftar produk yang pernah diorder outlet ini (ditarik dari data Surat Jalan). Centang produk yang mau dipakai, lalu klik <strong>"Buat PO dari Pilihan"</strong> untuk langsung membuat form order baru buat outlet ini.
+        Daftar produk yang pernah diorder outlet ini (ditarik dari data Surat Jalan). Centang produk untuk <strong>"Buat PO dari Pilihan"</strong> (langsung bikin form order internal). Atau klik <strong>"Buat Form Order"</strong> untuk membuat file Excel siap kirim ke outlet ini supaya mereka isi qty pesanannya sendiri.
       </p>
       <div style="overflow-x:auto">
         <table class="items-table">
@@ -1447,7 +1447,8 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('outletHistoryModal')">Tutup</button>
-      <button class="btn btn-outline" onclick="exportOutletHistoryExcel()">📊 Export Excel</button>
+      <button class="btn btn-outline" onclick="exportOutletHistoryExcel()">📊 Export Riwayat (Excel)</button>
+      <button class="btn btn-primary" onclick="exportOutletOrderForm()" style="background:#2E7D32">📝 Buat Form Order (kirim ke Outlet)</button>
       <button class="btn btn-primary" onclick="buildPOFromOutletHistory()">🧾 Buat PO dari Pilihan</button>
     </div>
   </div>
@@ -3084,6 +3085,58 @@ function exportOutletHistoryExcel() {
   const safeName = (customer?.name || 'Outlet').replace(/[^a-z0-9]+/gi, '-');
   XLSX.writeFile(wb, `Riwayat-Order-${safeName}-${today()}.xlsx`);
   showToast('Riwayat order berhasil didownload ke Excel!');
+}
+
+// Bikin file Excel berupa FORM ORDER yang siap dikirim ke outlet — bukan buat internal,
+// tapi buat outlet isi sendiri qty pesanan mereka lalu dikirim balik ke kita.
+function exportOutletOrderForm() {
+  const customerId = document.getElementById('outlet-history-customer-id').value;
+  const data = loadData();
+  const customer = data.customers.find(c => c.id == customerId);
+  if (!customer) return;
+  const profile = getCompanyProfile();
+
+  // Basis daftar barang: produk yang biasa diorder outlet ini (dari histori SJ).
+  // Kalau outlet ini belum pernah order sama sekali, pakai seluruh katalog produk aktif sbg gantinya.
+  const history = getOutletProductHistory(customerId);
+  const useAllProducts = history.length === 0;
+  const sourceRows = useAllProducts
+    ? data.products.map(p => ({ name: p.name, uom: p.uom || 'pcs', lastPrice: p.sellPrice || p.price || 0, totalQty: 0, lastDate: '' }))
+    : history;
+  const sortedRows = [...sourceRows].sort((a, b) => a.name.localeCompare(b.name));
+
+  // Susun lembar Excel manual (baris per baris) biar ada header info toko & outlet,
+  // bukan cuma tabel data mentah kayak export Riwayat.
+  const aoa = [];
+  aoa.push([profile.name || 'Form Pemesanan']);
+  aoa.push(['FORM PEMESANAN / ORDER OUTLET']);
+  aoa.push([]);
+  aoa.push(['Outlet', customer.name]);
+  aoa.push(['Tanggal', fmtDate(today())]);
+  aoa.push(['No. PO (diisi outlet, opsional)', '']);
+  aoa.push([]);
+  aoa.push(['No', 'Nama Barang', 'UOM', 'Harga Terakhir', useAllProducts ? '(Baru — belum pernah diorder)' : 'Qty Order Terakhir', 'QTY PESANAN (Diisi Outlet)']);
+  sortedRows.forEach((r, idx) => {
+    aoa.push([idx + 1, r.name, r.uom || 'pcs', r.lastPrice || 0, useAllProducts ? '' : r.totalQty, '']);
+  });
+  aoa.push([]);
+  aoa.push(['Item Tambahan (di luar daftar di atas, tulis manual):']);
+  for (let i = 0; i < 5; i++) aoa.push(['', '', '', '', '', '']);
+  aoa.push([]);
+  aoa.push(['Catatan Outlet', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }
+  ];
+  ws['!cols'] = [{ wch: 5 }, { wch: 35 }, { wch: 8 }, { wch: 15 }, { wch: 22 }, { wch: 22 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Form Order');
+  const safeName = customer.name.replace(/[^a-z0-9]+/gi, '-');
+  XLSX.writeFile(wb, `Form-Order-${safeName}-${today()}.xlsx`);
+  showToast(`Form order untuk ${customer.name} siap dikirim! 📤`);
 }
 
 // Bikin form PO baru langsung terisi dari produk-produk riwayat yang dicentang
