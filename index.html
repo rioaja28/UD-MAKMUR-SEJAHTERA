@@ -1176,7 +1176,7 @@
           <thead>
             <tr>
               <th style="width:24px"></th>
-              <th>Barang</th>
+              <th style="width:40%">Barang</th>
               <th>Qty</th>
               <th>UOM</th>
               <th>Harga</th>
@@ -1260,7 +1260,7 @@
           <thead>
             <tr>
               <th style="width:24px"></th>
-              <th>Barang</th>
+              <th style="width:40%">Barang</th>
               <th>Qty</th>
               <th>UOM</th>
               <th>Harga</th>
@@ -4048,7 +4048,7 @@ function addSOItem(presetName, presetQty, presetUom, presetPrice) {
   const row = document.createElement('tr');
   row.innerHTML = `
     <td></td>
-    <td><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
+    <td style="min-width:160px"><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." style="width:100%" value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
     <td><input type="number" name="qty" value="${presetQty || 1}" min="1" onchange="calculateTotal()"></td>
     <td><input type="text" name="itemUOM" placeholder="pcs" value="${presetUom || ''}" readonly style="background: var(--bg);"></td>
     <td><input type="number" name="itemPrice" value="${presetPrice || 0}" min="0" onchange="calculateTotal()"></td>
@@ -4561,7 +4561,7 @@ function addInvItem(presetName, presetQty, presetPrice, presetUom) {
   const row = document.createElement('tr');
   row.innerHTML = `
     <td></td>
-    <td><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
+    <td style="min-width:160px"><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." style="width:100%" value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
     <td><input type="number" name="qty" value="${presetQty || 1}" min="1" onchange="calculateTotal()"></td>
     <td><input type="text" name="itemUOM" placeholder="pcs" value="${presetUom || ''}" readonly style="background: var(--bg);"></td>
     <td><input type="number" name="itemPrice" value="${presetPrice || 0}" min="0" onchange="calculateTotal()"></td>
