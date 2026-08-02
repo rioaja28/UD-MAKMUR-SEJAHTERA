@@ -1221,10 +1221,6 @@
         <label>No Invoice</label>
         <input type="text" id="inv-no" placeholder="Auto generate" readonly>
       </div>
-      <div class="form-group full">
-        <label>Referensi Surat Jalan (Opsional)</label>
-        <select id="inv-so-ref" onchange="loadSOIntoInv()"></select>
-      </div>
       <div class="form-group">
         <label>Customer</label>
         <select id="inv-customer" onchange="onInvCustomerChange()"></select>
@@ -1250,6 +1246,14 @@
         <select id="inv-payment-account"></select>
       </div>
       <div class="form-group full" id="inv-customer-address" style="display:none; background: var(--bg); padding: 10px 12px; border-radius: 8px; font-size: 12px;"></div>
+
+      <div class="form-group full">
+        <label>Surat Jalan yang Ditagih (Opsional, boleh pilih lebih dari 1)</label>
+        <div id="inv-so-checkboxes" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;max-height:220px;overflow-y:auto;background:var(--bg);font-size:13px">
+          <span style="font-size:12px;color:var(--text-muted)">Pilih Customer dahulu untuk melihat daftar Surat Jalan</span>
+        </div>
+        <small style="color:var(--text-muted);display:block;margin-top:4px">💡 Centang salah satu SJ dari SJ Susulan (No. PO sama, misal ada tanda "(susulan)") akan otomatis mengikutkan pasangannya, supaya gampang digabung jadi 1 Invoice. Item dari semua SJ terpilih otomatis digabung ke tabel di bawah.</small>
+      </div>
 
       <div class="items-section">
         <table class="items-table">
@@ -1405,6 +1409,46 @@
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('customerModal')">Batal</button>
       <button class="btn btn-primary" id="customerSaveBtn" onclick="saveCustomerModal()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- RIWAYAT ORDER OUTLET MODAL -->
+<div class="modal-overlay" id="outletHistoryModal">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-header">
+      <div class="modal-title" id="outletHistoryTitle">📦 Riwayat Order Outlet</div>
+      <button class="modal-close" onclick="closeModal('outletHistoryModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="outlet-history-customer-id" value="">
+      <div class="form-group full" style="margin-bottom:6px">
+        <input type="text" id="outlet-history-search" placeholder="🔍 Cari nama produk..." oninput="renderOutletHistory(document.getElementById('outlet-history-customer-id').value)">
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
+        Daftar produk yang pernah diorder outlet ini (ditarik dari data Surat Jalan). Centang produk yang mau dipakai, lalu klik <strong>"Buat PO dari Pilihan"</strong> untuk langsung membuat form order baru buat outlet ini.
+      </p>
+      <div style="overflow-x:auto">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width:24px"><input type="checkbox" onchange="toggleOutletHistorySelectAll(this)" style="width:15px;height:15px;accent-color:var(--purple)"></th>
+              <th>Nama Barang</th>
+              <th>Total Qty</th>
+              <th>UOM</th>
+              <th>Jml SJ</th>
+              <th>Harga Terakhir</th>
+              <th>Order Terakhir</th>
+            </tr>
+          </thead>
+          <tbody id="outlet-history-table"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('outletHistoryModal')">Tutup</button>
+      <button class="btn btn-outline" onclick="exportOutletHistoryExcel()">📊 Export Excel</button>
+      <button class="btn btn-primary" onclick="buildPOFromOutletHistory()">🧾 Buat PO dari Pilihan</button>
     </div>
   </div>
 </div>
@@ -2155,6 +2199,39 @@ function generateSJNumber(outletName) {
   return prefix + String(n).padStart(4, '0');
 }
 
+// Menghilangkan tanda "(susulan)" dkk dari nomor PO, supaya PO/SJ yang sebenarnya
+// masih 1 order yang sama (misal "PO.2026.07.00052" dan "PO.2026.07.00052 (susulan)")
+// bisa dikenali sebagai 1 grup — dipakai saat menggabungkan beberapa SJ ke 1 Invoice.
+function normalizePoNo(poNo) {
+  if (!poNo) return '';
+  return poNo.toString().replace(/\s*\(\s*susulan[^)]*\)\s*/gi, '').trim().toLowerCase();
+}
+
+// Invoice sekarang bisa merujuk ke LEBIH DARI SATU Surat Jalan (misal SJ pertama +
+// SJ susulan dari PO yang sama). Disimpan sebagai array `soIds`/`soNos`. Field lama
+// `soId`/`soNo` (tunggal) tetap diisi otomatis dengan SJ pertama, supaya bagian lain
+// di aplikasi yang masih pakai field lama tetap jalan normal.
+function getInvSoIds(inv) {
+  if (Array.isArray(inv.soIds) && inv.soIds.length > 0) return inv.soIds;
+  return inv.soId ? [inv.soId] : [];
+}
+function getInvSoRecords(data, inv) {
+  const ids = getInvSoIds(inv);
+  if (ids.length > 0) {
+    return ids.map(id => data.sos.find(s => String(s.id) === String(id))).filter(Boolean);
+  }
+  if (inv.soNo) {
+    const so = data.sos.find(s => s.no === inv.soNo);
+    return so ? [so] : [];
+  }
+  return [];
+}
+function getInvSoNos(data, inv) {
+  const recs = getInvSoRecords(data, inv);
+  if (recs.length > 0) return recs.map(s => s.no);
+  return inv.soNo ? [inv.soNo] : [];
+}
+
 // Dipanggil tiap kali outlet di form Surat Jalan dipilih/diganti — nomor SJ
 // otomatis ke-generate ulang sesuai outlet yang baru dipilih.
 function updateSONumberFromOutlet() {
@@ -2880,6 +2957,7 @@ function renderCustomers() {
       <td>${c.phone}</td>
       <td>${c.address}</td>
       <td class="action-btns">
+        ${c.type === 'outlet' ? `<button class="btn btn-sm btn-outline" onclick="openOutletHistoryModal(${c.id})">📦 Riwayat</button>` : ''}
         <button class="btn btn-sm btn-outline" onclick="editCustomer(${c.id})">Edit</button>
         <button class="btn btn-sm btn-outline" onclick="deleteCustomer(${c.id})">Hapus</button>
       </td>
@@ -2905,6 +2983,126 @@ function deleteCustomer(id) {
       showToast('Penghapusan dibatalkan.');
     });
   }
+}
+
+// ===== RIWAYAT ORDER OUTLET (produk yang pernah diorder, ditarik dari data Surat Jalan) =====
+let lastOutletHistoryRows = [];
+
+function openOutletHistoryModal(customerId) {
+  const data = loadData();
+  const customer = data.customers.find(c => c.id == customerId);
+  if (!customer) return;
+  document.getElementById('outletHistoryTitle').textContent = `📦 Riwayat Order — ${customer.name}`;
+  document.getElementById('outlet-history-customer-id').value = customerId;
+  document.getElementById('outlet-history-search').value = '';
+  renderOutletHistory(customerId);
+  document.getElementById('outletHistoryModal').classList.add('open');
+}
+
+// Kumpulkan & ringkas semua produk yang pernah dikirim (via Surat Jalan) ke outlet ini
+function getOutletProductHistory(customerId) {
+  const data = loadData();
+  const sos = data.sos.filter(so => String(so.customer) === String(customerId));
+  const map = {};
+  sos.forEach(so => {
+    so.items.forEach(item => {
+      if (!item.name) return;
+      if (!map[item.name]) {
+        map[item.name] = { name: item.name, uom: item.uom || 'pcs', totalQty: 0, soCount: 0, lastPrice: item.price || 0, lastDate: '', firstDate: '' };
+      }
+      const g = map[item.name];
+      g.totalQty += (item.qty || 0);
+      g.soCount += 1;
+      if (!g.lastDate || (so.date || '') > g.lastDate) { g.lastDate = so.date || ''; g.lastPrice = item.price || 0; }
+      if (!g.firstDate || (so.date || '') < g.firstDate) g.firstDate = so.date || '';
+    });
+  });
+  return Object.values(map).sort((a, b) => b.totalQty - a.totalQty);
+}
+
+function renderOutletHistory(customerId) {
+  const term = (document.getElementById('outlet-history-search')?.value || '').trim().toLowerCase();
+  const all = getOutletProductHistory(customerId);
+  const rows = term ? all.filter(r => r.name.toLowerCase().includes(term)) : all;
+  lastOutletHistoryRows = rows;
+  const tbody = document.getElementById('outlet-history-table');
+  if (rows.length === 0) {
+    const msg = all.length === 0
+      ? 'Outlet ini belum pernah order produk apapun (belum ada Surat Jalan)'
+      : `Tidak ada produk yang cocok dengan pencarian "${term}"`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">${msg}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map((r, idx) => `
+    <tr>
+      <td><input type="checkbox" class="outlet-history-check" value="${idx}" style="width:15px;height:15px;accent-color:var(--purple)"></td>
+      <td title="${r.name}">${r.name}</td>
+      <td style="text-align:center">${r.totalQty}</td>
+      <td>${r.uom}</td>
+      <td style="text-align:center">${r.soCount}x</td>
+      <td style="text-align:right">${rupiah(r.lastPrice)}</td>
+      <td>${fmtDate(r.lastDate)}</td>
+    </tr>
+  `).join('');
+}
+
+function toggleOutletHistorySelectAll(checkbox) {
+  document.querySelectorAll('.outlet-history-check').forEach(cb => cb.checked = checkbox.checked);
+}
+
+function exportOutletHistoryExcel() {
+  const customerId = document.getElementById('outlet-history-customer-id').value;
+  const data = loadData();
+  const customer = data.customers.find(c => c.id == customerId);
+  const rows = getOutletProductHistory(customerId);
+  if (rows.length === 0) {
+    alert('Tidak ada data riwayat order untuk outlet ini');
+    return;
+  }
+  const excelRows = rows.map(r => ({
+    'Nama Barang': r.name,
+    'Total Qty Pernah Diorder': r.totalQty,
+    'UOM': r.uom,
+    'Jumlah Pengiriman (SJ)': r.soCount,
+    'Harga Terakhir': r.lastPrice,
+    'Order Pertama': fmtDate(r.firstDate),
+    'Order Terakhir': fmtDate(r.lastDate)
+  }));
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+  const colKeys = Object.keys(excelRows[0]);
+  ws['!cols'] = colKeys.map(key => {
+    const headerLen = key.length;
+    const maxContentLen = excelRows.reduce((max, row) => {
+      const val = row[key];
+      const len = val === null || val === undefined ? 0 : String(val).length;
+      return Math.max(max, len);
+    }, 0);
+    return { wch: Math.min(Math.max(headerLen, maxContentLen) + 2, 60) };
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Riwayat Order');
+  const safeName = (customer?.name || 'Outlet').replace(/[^a-z0-9]+/gi, '-');
+  XLSX.writeFile(wb, `Riwayat-Order-${safeName}-${today()}.xlsx`);
+  showToast('Riwayat order berhasil didownload ke Excel!');
+}
+
+// Bikin form PO baru langsung terisi dari produk-produk riwayat yang dicentang
+function buildPOFromOutletHistory() {
+  const customerId = document.getElementById('outlet-history-customer-id').value;
+  const checked = Array.from(document.querySelectorAll('.outlet-history-check:checked')).map(cb => parseInt(cb.value));
+  if (checked.length === 0) {
+    alert('Pilih minimal 1 produk untuk dibuatkan form order (PO)');
+    return;
+  }
+  const selected = checked.map(idx => lastOutletHistoryRows[idx]).filter(Boolean);
+  closeModal('outletHistoryModal');
+  openPOModal();
+  populateCustomerSelect('po-supplier', customerId, 'outlet');
+  showSelectedAddress('po-supplier', 'po-outlet-address');
+  document.getElementById('po-items').innerHTML = '';
+  selected.forEach(item => addPOItem(item.name, item.totalQty > 0 ? item.totalQty : 1, item.lastPrice, item.uom));
+  calculateTotal();
+  showToast(`✅ Form PO dibuat dari ${selected.length} produk riwayat order outlet ini. Cek & sesuaikan qty-nya ya.`);
 }
 
 function populateCustomerSelect(selectId, selectedId, type) {
@@ -3193,10 +3391,11 @@ function exportTableToExcel(type) {
     filename = 'Export-Invoice';
     data.invs.forEach(inv => {
       const customer = data.customers.find(c => c.id == inv.customer)?.name || 'Unknown';
-      const soRecord = inv.soNo ? data.sos.find(s => s.no === inv.soNo) : null;
-      const tglKirim = soRecord?.date || inv.deliveryDate || '-';
+      const soRecords = getInvSoRecords(data, inv);
+      const soNosStr = soRecords.length > 0 ? soRecords.map(s => s.no).join(', ') : (inv.soNo || '-');
+      const tglKirim = (soRecords.map(s => s.date).filter(Boolean).sort()[0]) || inv.deliveryDate || '-';
       inv.items.forEach(item => rows.push({
-        'No Invoice': inv.no, 'Ref SJ': inv.soNo || '-', 'Customer': customer, 'Tanggal': inv.date, 'Tanggal Kirim': tglKirim, 'Jatuh Tempo': inv.due, 'Status': inv.status,
+        'No Invoice': inv.no, 'Ref SJ': soNosStr, 'Customer': customer, 'Tanggal': inv.date, 'Tanggal Kirim': tglKirim, 'Jatuh Tempo': inv.due, 'Status': inv.status,
         'Nama Barang': item.name, 'Qty': item.qty, 'Harga': item.price, 'Subtotal': item.qty * item.price, 'Catatan': inv.notes || ''
       }));
     });
@@ -3795,7 +3994,6 @@ function addSOItem(presetName, presetQty, presetUom, presetPrice) {
   
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td style="text-align:center;"><span class="row-drag-handle" title="Geser buat ubah urutan">⠿</span></td>
     <td><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
     <td><input type="number" name="qty" value="${presetQty || 1}" min="1" onchange="calculateTotal()"></td>
     <td><input type="text" name="itemUOM" placeholder="pcs" value="${presetUom || ''}" readonly style="background: var(--bg);"></td>
@@ -3805,7 +4003,6 @@ function addSOItem(presetName, presetQty, presetUom, presetPrice) {
   `;
   
   tbody.appendChild(row);
-  initSortableTbody('so-items');
   
   const input = row.querySelector('input[name="itemName"]');
   const dropdown = document.createElement('div');
@@ -3995,11 +4192,14 @@ function renderSOs() {
     const photoBadge = photoCount > 0
       ? `<span class="photo-badge has-photos">📷 ${photoCount}</span>`
       : `<span class="photo-badge">📷 0</span>`;
+    // Tandai kalau ada SJ lain dgn No. PO sama (misal pasangan SJ susulan), biar gampang dikenali
+    const hasPoGroup = so.poNo && data.sos.some(s => s.id !== so.id && normalizePoNo(s.poNo) === normalizePoNo(so.poNo));
+    const poNoCell = so.poNo ? `${so.poNo}${hasPoGroup ? ' <span title="Ada SJ lain dgn No. PO yang sama (kemungkinan susulan) — bisa digabung 1 Invoice" style="color:var(--purple)">🔗</span>' : ''}` : '-';
     
     return `<tr>
       <td><strong>${so.no}</strong></td>
       <td>${customer}</td>
-      <td>${so.poNo || '-'}</td>
+      <td>${poNoCell}</td>
       <td>${fmtDate(so.date)}</td>
       <td>${so.items.length}</td>
       <td><span class="badge ${badgeClass}">${so.status}</span><br>${photoBadge}</td>
@@ -4196,6 +4396,108 @@ function onInvCustomerChange() {
   const data = loadData();
   const customer = data.customers.find(c => c.id == document.getElementById('inv-customer').value);
   populatePaymentAccountSelect('inv-payment-account', customer?.defaultPaymentAccountId || '');
+  renderInvSOCheckboxesForCustomer();
+}
+
+// ===== REFERENSI SURAT JALAN DI INVOICE (multi-pilih, auto-grup per No. PO) =====
+
+// Tampilkan daftar SJ milik customer yang lagi dipilih di form Invoice.
+// preselectedIds: id-id SJ yang harus tercentang duluan (dipakai saat edit invoice).
+function renderInvSOCheckboxesForCustomer(preselectedIds) {
+  const data = loadData();
+  const custId = document.getElementById('inv-customer').value;
+  const box = document.getElementById('inv-so-checkboxes');
+  if (!box) return;
+  if (!custId) {
+    box.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Pilih Customer dahulu untuk melihat daftar Surat Jalan</span>';
+    return;
+  }
+  const pre = (preselectedIds || []).map(String);
+  // SJ yang belum "Selesai" (belum diinvoice) ATAU SJ yang memang sudah terpasang di invoice ini (saat edit)
+  const custSOs = data.sos.filter(so => String(so.customer) === String(custId) && (so.status !== 'Selesai' || pre.includes(String(so.id))));
+  renderInvSOCheckboxList(custSOs, pre);
+}
+
+function renderInvSOCheckboxList(allSOs, selectedIds) {
+  const box = document.getElementById('inv-so-checkboxes');
+  if (!box) return;
+  if (!allSOs || allSOs.length === 0) {
+    box.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Tidak ada Surat Jalan yang belum diinvoice untuk customer ini</span>';
+    return;
+  }
+  // Kelompokkan berdasarkan No. PO yang sudah dinormalisasi (tanpa "(susulan)")
+  const groups = {};
+  allSOs.forEach(so => {
+    const key = normalizePoNo(so.poNo) || ('__solo_' + so.id);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(so);
+  });
+  const groupList = Object.entries(groups).map(([key, list]) => ({
+    key, list: [...list].sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+  }));
+  groupList.sort((a, b) => {
+    const da = a.list[a.list.length - 1].date || '';
+    const db = b.list[b.list.length - 1].date || '';
+    return db.localeCompare(da);
+  });
+
+  let html = '';
+  groupList.forEach(({ key, list }) => {
+    const isGroup = list.length > 1 && !key.startsWith('__solo_');
+    html += `<div style="${isGroup ? 'border-left:3px solid var(--purple);padding:4px 0 4px 8px;margin:6px 0;background:var(--purple-light);border-radius:0 6px 6px 0' : 'padding:2px 0'}">`;
+    if (isGroup) {
+      html += `<div style="font-size:11px;color:var(--purple);font-weight:700;margin-bottom:2px">🔗 1 PO yang sama (${list.length} SJ, termasuk susulan) — otomatis 1 grup</div>`;
+    }
+    list.forEach(so => {
+      const total = so.items.reduce((s, i) => s + (i.qty || 0) * (i.price || 0), 0);
+      const checked = selectedIds.includes(String(so.id)) ? 'checked' : '';
+      const doneBadge = so.status === 'Selesai' ? ' <span style="background:#E8F5E9;color:#2E7D32;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px">✓ sudah diinvoice</span>' : '';
+      html += `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding:3px 0">
+        <input type="checkbox" class="inv-so-checkbox" value="${so.id}" data-pogroup="${key}" ${checked} onchange="onInvSOCheckboxChange(this)" style="width:15px;height:15px;accent-color:var(--purple);flex-shrink:0">
+        <span><strong>${so.no}</strong>${so.poNo ? ' · PO: ' + so.poNo : ''} · ${fmtDate(so.date)} · ${rupiah(total)}${doneBadge}</span>
+      </label>`;
+    });
+    html += `</div>`;
+  });
+  box.innerHTML = html;
+}
+
+// Saat 1 checkbox SJ dicentang, otomatis ikut-centang SJ lain di grup PO yang sama
+// (misalnya SJ susulan-nya), lalu muat ulang item ke tabel Invoice.
+function onInvSOCheckboxChange(checkbox) {
+  const group = checkbox.dataset.pogroup || '';
+  if (checkbox.checked && group && !group.startsWith('__solo_')) {
+    let added = 0;
+    document.querySelectorAll('#inv-so-checkboxes .inv-so-checkbox').forEach(cb => {
+      if (cb.dataset.pogroup === group && !cb.checked) { cb.checked = true; added++; }
+    });
+    if (added > 0) showToast(`${added} SJ lain dari PO yang sama otomatis ikut ditambahkan 🔗`);
+  }
+  loadSelectedSOsIntoInv();
+}
+
+function getSelectedInvSOIds() {
+  return Array.from(document.querySelectorAll('#inv-so-checkboxes .inv-so-checkbox:checked')).map(cb => cb.value);
+}
+
+// Gabungkan item dari semua SJ yang dicentang ke tabel Invoice.
+// Item dengan nama+harga+uom sama akan digabung (qty dijumlah).
+function loadSelectedSOsIntoInv() {
+  const data = loadData();
+  const ids = getSelectedInvSOIds();
+  document.getElementById('inv-items').innerHTML = '';
+  if (ids.length === 0) { calculateTotal(); return; }
+  const selectedSOs = ids.map(id => data.sos.find(s => String(s.id) === String(id))).filter(Boolean);
+  const merged = [];
+  selectedSOs.forEach(so => {
+    so.items.forEach(item => {
+      const existing = merged.find(m => m.name === item.name && m.price === item.price && (m.uom || 'pcs') === (item.uom || 'pcs'));
+      if (existing) existing.qty = (existing.qty || 0) + (item.qty || 0);
+      else merged.push({ ...item });
+    });
+  });
+  merged.forEach(item => addInvItem(item.name, item.qty, item.price, item.uom));
+  calculateTotal();
 }
 
 function addInvItem(presetName, presetQty, presetPrice, presetUom) {
@@ -4204,7 +4506,6 @@ function addInvItem(presetName, presetQty, presetPrice, presetUom) {
   
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td style="text-align:center;"><span class="row-drag-handle" title="Geser buat ubah urutan">⠿</span></td>
     <td><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
     <td><input type="number" name="qty" value="${presetQty || 1}" min="1" onchange="calculateTotal()"></td>
     <td><input type="text" name="itemUOM" placeholder="pcs" value="${presetUom || ''}" readonly style="background: var(--bg);"></td>
@@ -4214,7 +4515,6 @@ function addInvItem(presetName, presetQty, presetPrice, presetUom) {
   `;
   
   tbody.appendChild(row);
-  initSortableTbody('inv-items');
   
   const input = row.querySelector('input[name="itemName"]');
   const dropdown = document.createElement('div');
@@ -4245,31 +4545,6 @@ function selectInvItem(element, name, price, uom) {
   calculateTotal();
 }
 
-function populateSORefSelect(selectedId) {
-  const data = loadData();
-  const select = document.getElementById('inv-so-ref');
-  if (!select) return;
-  select.innerHTML = `<option value="">-- Tanpa referensi Surat Jalan --</option>` +
-    data.sos.map(so => {
-      const customer = data.customers.find(c => c.id == so.customer)?.name || 'Unknown';
-      return `<option value="${so.id}" ${so.id == selectedId ? 'selected' : ''}>${so.no} - ${customer}${so.status === 'Selesai' ? ' ✓' : ''}</option>`;
-    }).join('');
-}
-
-function loadSOIntoInv() {
-  const data = loadData();
-  const soId = document.getElementById('inv-so-ref').value;
-  const so = data.sos.find(s => s.id == soId);
-  if (!so) return;
-
-  populateCustomerSelect('inv-customer', so.customer, 'outlet');
-  showSelectedAddress('inv-customer', 'inv-customer-address');
-
-  document.getElementById('inv-items').innerHTML = '';
-  so.items.forEach(item => addInvItem(item.name, item.qty, item.price, item.uom));
-  calculateTotal();
-}
-
 function openInvModal() {
   editingInvId = null;
   resetInvModal();
@@ -4284,7 +4559,6 @@ function editInv(id) {
   editingInvId = id;
   document.getElementById('invModalTitle').textContent = 'Edit / Revisi Invoice';
   document.getElementById('inv-no').value = inv.no;
-  populateSORefSelect(inv.soId || '');
   populateCustomerSelect('inv-customer', inv.customer, 'outlet');
   document.getElementById('inv-date').value = inv.date;
   document.getElementById('inv-due').value = inv.due;
@@ -4293,6 +4567,7 @@ function editInv(id) {
   document.getElementById('inv-discount').value = inv.discount || 0;
   populatePaymentAccountSelect('inv-payment-account', inv.paymentAccountId || '');
   showSelectedAddress('inv-customer', 'inv-customer-address');
+  renderInvSOCheckboxesForCustomer(getInvSoIds(inv));
   document.getElementById('inv-items').innerHTML = '';
   inv.items.forEach(item => addInvItem(item.name, item.qty, item.price, item.uom));
   calculateTotal();
@@ -4318,8 +4593,8 @@ function saveInv() {
     return;
   }
 
-  const soRefId = document.getElementById('inv-so-ref').value || null;
-  const soRef = soRefId ? data.sos.find(s => s.id == soRefId) : null;
+  const soRefIds = getSelectedInvSOIds();
+  const soRefs = soRefIds.map(id => data.sos.find(s => String(s.id) === String(id))).filter(Boolean);
 
   const finalInvNo = document.getElementById('inv-no').value.trim() || generateNo('INV');
   const dupInv = data.invs.find(i => i.id !== editingInvId && (i.no || '').trim().toLowerCase() === finalInvNo.toLowerCase());
@@ -4339,8 +4614,10 @@ function saveInv() {
     inv.discount = parseFloat(document.getElementById('inv-discount').value) || 0;
     inv.status = document.getElementById('inv-status').value;
     inv.paymentAccountId = document.getElementById('inv-payment-account').value || null;
-    inv.soId = soRefId;
-    inv.soNo = soRef ? soRef.no : (inv.soNo || null);
+    inv.soIds = soRefIds;
+    inv.soNos = soRefs.map(s => s.no);
+    inv.soId = soRefIds[0] || null;
+    inv.soNo = soRefs[0] ? soRefs[0].no : null;
     logActivity(data, 'Invoice', 'Edit', `Merevisi Invoice ${inv.no}`);
     showToast('Invoice berhasil direvisi!');
   } else {
@@ -4355,22 +4632,24 @@ function saveInv() {
       discount: parseFloat(document.getElementById('inv-discount').value) || 0,
       status: document.getElementById('inv-status').value || 'Draft',
       paymentAccountId: document.getElementById('inv-payment-account').value || null,
-      soId: soRefId,
-      soNo: soRef ? soRef.no : null
+      soIds: soRefIds,
+      soNos: soRefs.map(s => s.no),
+      soId: soRefIds[0] || null,
+      soNo: soRefs[0] ? soRefs[0].no : null
     };
     data.invs.push(inv);
     logActivity(data, 'Invoice', 'Tambah', `Membuat Invoice ${inv.no}`);
     showToast('Invoice berhasil disimpan!');
   }
 
-  // Tandai Surat Jalan terkait sebagai Selesai karena sudah diinvoice
-  if (soRef) {
+  // Tandai semua Surat Jalan (dan PO terkait) yang direferensikan sebagai Selesai
+  soRefs.forEach(soRef => {
     soRef.status = 'Selesai';
     if (soRef.poId) {
       const poRef = data.pos.find(p => p.id == soRef.poId);
       if (poRef) poRef.status = 'Selesai';
     }
-  }
+  });
   
   saveData(data);
   closeModal('invModal');
@@ -4400,8 +4679,9 @@ function renderInvs() {
   if (q) {
     list = list.filter(inv => {
       const customer = (data.customers.find(c => c.id == inv.customer)?.name || '').toLowerCase();
+      const soNosStr = getInvSoNos(data, inv).join(' ').toLowerCase();
       return (inv.no || '').toLowerCase().includes(q) || customer.includes(q) ||
-        (inv.soNo || '').toLowerCase().includes(q) || (inv.status || '').toLowerCase().includes(q);
+        soNosStr.includes(q) || (inv.status || '').toLowerCase().includes(q);
     });
   }
 
@@ -4424,8 +4704,10 @@ function renderInvs() {
       : '<span style="color:var(--text-muted);font-size:11px">-</span>';
 
     // Tanggal Kirim diambil dari Surat Jalan yang direferensikan invoice ini
-    const soRecord = inv.soNo ? data.sos.find(s => s.no === inv.soNo) : null;
-    const tglKirim = soRecord?.date || inv.deliveryDate || null;
+    // (kalau lebih dari 1 SJ, pakai tanggal paling awal)
+    const soRecords = getInvSoRecords(data, inv);
+    const soNosDisplay = soRecords.length > 0 ? soRecords.map(s => s.no).join(', ') : (inv.soNo || '-');
+    const tglKirim = (soRecords.map(s => s.date).filter(Boolean).sort()[0]) || inv.deliveryDate || null;
     const tglKirimDisplay = tglKirim
       ? `<span style="font-size:11px">${fmtDate(tglKirim)}</span>`
       : '<span style="color:var(--text-muted);font-size:11px">-</span>';
@@ -4442,7 +4724,7 @@ function renderInvs() {
     return `<tr style="${rowStyle}">
       <td><strong>${inv.no}</strong></td>
       <td>${customer}</td>
-      <td>${inv.soNo || '-'}</td>
+      <td>${soNosDisplay}</td>
       <td>${fmtDate(inv.date)}</td>
       <td>${tglKirimDisplay}</td>
       <td>${dueDisplay}</td>
@@ -4709,8 +4991,8 @@ function deleteInv(id) {
 function resetInvModal() {
   editingInvId = null;
   document.getElementById('inv-no').value = generateNo('INV');
-  populateSORefSelect('');
   document.getElementById('inv-customer').value = '';
+  renderInvSOCheckboxesForCustomer([]);
   document.getElementById('inv-date').value = today();
   document.getElementById('inv-due').value = today();
   document.getElementById('inv-status').value = 'Draft';
@@ -5046,6 +5328,9 @@ function previewInv() {
     price: parseFloat(row.querySelector('[name="itemPrice"]').value)
   }));
   
+  const soRefIds = getSelectedInvSOIds();
+  const soRefs = soRefIds.map(id => data.sos.find(s => String(s.id) === String(id))).filter(Boolean);
+
   const inv = {
     no: document.getElementById('inv-no').value || generateNo('INV'),
     customer: document.getElementById('inv-customer').value,
@@ -5055,7 +5340,11 @@ function previewInv() {
     notes: document.getElementById('inv-notes').value,
     discount: parseFloat(document.getElementById('inv-discount').value) || 0,
     status: document.getElementById('inv-status').value || 'Draft',
-    paymentAccountId: document.getElementById('inv-payment-account').value || null
+    paymentAccountId: document.getElementById('inv-payment-account').value || null,
+    soIds: soRefIds,
+    soNos: soRefs.map(s => s.no),
+    soId: soRefIds[0] || null,
+    soNo: soRefs[0] ? soRefs[0].no : null
   };
   
   pdfDocData = { type: 'inv', doc: inv };
@@ -5190,10 +5479,12 @@ function generatePDFPreview(type) {
     fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
   } else if (isInv) {
     fieldRows = `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">Tanggal</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${fmtDate(doc.date)}</strong></td></tr>`;
-    const soRecord = doc.soNo ? data.sos.find(s => s.no === doc.soNo) : null;
-    const refPoNo = soRecord?.poNo || doc.poNo || null;
+    const soRecords = getInvSoRecords(data, doc);
+    const soNosList = soRecords.length > 0 ? soRecords.map(s => s.no) : (doc.soNo ? [doc.soNo] : []);
+    const poNosList = [...new Set(soRecords.map(s => s.poNo).filter(Boolean))];
+    const refPoNo = poNosList.length > 0 ? poNosList.join(', ') : (doc.poNo || null);
     if (refPoNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. PO</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${refPoNo}</strong></td></tr>`;
-    if (doc.soNo) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.soNo}</strong></td></tr>`;
+    if (soNosList.length > 0) fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. SJ</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${soNosList.join(', ')}</strong></td></tr>`;
     fieldRows += `<tr><td style="border:none;padding:2px 10px 2px 0;font-size:12px">No. Invoice</td><td style="border:none;padding:2px 0;font-size:12px">: <strong>${doc.no}</strong></td></tr>`;
   }
 
@@ -6140,8 +6431,8 @@ function renderSttpInvCheckboxes(allInvs, selectedNos) {
   box.innerHTML = allInvs.map(inv => {
     const total = inv.items.reduce((s, i) => s + i.qty * i.price, 0) - (inv.discount || 0);
     const checked = selectedNos.includes(inv.no) ? 'checked' : '';
-    const soRecord = inv.soNo ? data.sos.find(s => s.no === inv.soNo) : null;
-    const tglKirim = soRecord?.date || inv.deliveryDate || inv.date; // fallback ke tgl invoice kalau SJ tidak ditemukan
+    const soRecords = getInvSoRecords(data, inv);
+    const tglKirim = (soRecords.map(s => s.date).filter(Boolean).sort()[0]) || inv.deliveryDate || inv.date; // fallback ke tgl invoice kalau SJ tidak ditemukan
     const lunasBadge = inv.status === 'Lunas'
       ? ' <span style="background:#E8F5E9;color:#2E7D32;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px">✅ LUNAS</span>'
       : '';
@@ -6410,10 +6701,10 @@ function generateSttpPreview(sttp) {
     const invRows = sttp.invNos.map(invNo => {
       const inv = data.invs.find(i => i.no === invNo);
       const invTotal = inv ? inv.items.reduce((s, i) => s + i.qty * i.price, 0) - (inv.discount || 0) : 0;
-      const so = inv && inv.soRefId ? data.sos?.find(s => s.id === inv.soRefId) : null;
-      const soByNo = (!so && inv?.soNo) ? data.sos?.find(s => s.no === inv.soNo) : null;
-      const poNo = so?.poNo || soByNo?.poNo || inv?.poNo || '-'; // No PO yang direferensikan Surat Jalan
-      const tglKirim = so?.date || soByNo?.date || inv?.deliveryDate || inv?.date; // fallback kalau SJ tidak ditemukan
+      const soRecords = inv ? getInvSoRecords(data, inv) : [];
+      const poNoList = [...new Set(soRecords.map(s => s.poNo).filter(Boolean))];
+      const poNo = poNoList.length > 0 ? poNoList.join(', ') : (inv?.poNo || '-'); // No PO yang direferensikan Surat Jalan
+      const tglKirim = (soRecords.map(s => s.date).filter(Boolean).sort()[0]) || inv?.deliveryDate || inv?.date; // fallback kalau SJ tidak ditemukan
       return { invNo, invTotal, poNo, tglKirim };
     });
     // Urutkan dari tanggal kirim paling awal (yg tidak ada tanggal diletakkan di akhir)
