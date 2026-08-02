@@ -428,8 +428,8 @@
           <div class="table-header">
             <div class="table-title">🍩 Omset per Outlet</div>
           </div>
-          <div style="padding:20px 20px 0">
-            <canvas id="omsetOutletChart" height="230"></canvas>
+          <div style="padding:16px 20px 0;max-width:230px;margin:0 auto">
+            <canvas id="omsetOutletChart" height="170"></canvas>
           </div>
           <div class="outlet-legend-head">
             <div style="flex:1">Outlet</div>
@@ -442,8 +442,8 @@
           <div class="table-header">
             <div class="table-title">🍩 Jumlah Invoice per Outlet</div>
           </div>
-          <div style="padding:20px 20px 0">
-            <canvas id="invCountOutletChart" height="230"></canvas>
+          <div style="padding:16px 20px 0;max-width:230px;margin:0 auto">
+            <canvas id="invCountOutletChart" height="170"></canvas>
           </div>
           <div class="outlet-legend-head">
             <div style="flex:1">Outlet</div>
@@ -5351,6 +5351,9 @@ function renderOutletDonutCharts(data, filteredInvs) {
     },
     options: {
       cutout: '62%',
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1,
       plugins: {
         legend: { display: false },
         tooltip: {
