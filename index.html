@@ -4047,6 +4047,7 @@ function addSOItem(presetName, presetQty, presetUom, presetPrice) {
   
   const row = document.createElement('tr');
   row.innerHTML = `
+    <td></td>
     <td><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
     <td><input type="number" name="qty" value="${presetQty || 1}" min="1" onchange="calculateTotal()"></td>
     <td><input type="text" name="itemUOM" placeholder="pcs" value="${presetUom || ''}" readonly style="background: var(--bg);"></td>
@@ -4559,6 +4560,7 @@ function addInvItem(presetName, presetQty, presetPrice, presetUom) {
   
   const row = document.createElement('tr');
   row.innerHTML = `
+    <td></td>
     <td><div style="position: relative;"><input type="text" name="itemName" placeholder="Cari barang..." value="${presetName ? presetName.replace(/"/g, '&quot;') : ''}"></div></td>
     <td><input type="number" name="qty" value="${presetQty || 1}" min="1" onchange="calculateTotal()"></td>
     <td><input type="text" name="itemUOM" placeholder="pcs" value="${presetUom || ''}" readonly style="background: var(--bg);"></td>
