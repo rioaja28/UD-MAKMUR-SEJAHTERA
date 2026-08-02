@@ -591,6 +591,7 @@
                 <th>Tanggal TF</th>
                 <th>Outlet</th>
                 <th style="text-align:right">Nominal TF</th>
+                <th>Rekening Tujuan</th>
                 <th>Invoice yang Dibayar</th>
                 <th>Catatan</th>
                 <th>Aksi</th>
@@ -1355,6 +1356,10 @@
         </div>
       </div>
       <div class="form-group full" id="pb-match-summary" style="background:var(--bg);padding:10px 12px;border-radius:8px;font-size:13px;font-weight:600"></div>
+      <div class="form-group full">
+        <label>Ditransfer ke Rekening <span style="color:#d44">*</span></label>
+        <select id="pb-payment-account" required></select>
+      </div>
       <div class="form-group full">
         <label>Catatan (Opsional)</label>
         <textarea id="pb-notes" placeholder="Misal: transfer via BCA a.n. Budi"></textarea>
@@ -3514,6 +3519,7 @@ function exportTableToExcel(type) {
           'No Invoice': inv.no,
           'Nominal Invoice': inv.amount !== null ? inv.amount : '',
           'Nominal Transfer': idx === 0 ? p.amount : '',
+          'Rekening Tujuan': p.paymentAccountLabel || '',
           'Catatan': p.notes || ''
         });
       });
@@ -4859,6 +4865,7 @@ function openPaymentModal() {
   document.getElementById('pb-date').value = today();
   document.getElementById('pb-amount').value = '';
   document.getElementById('pb-notes').value = '';
+  populatePaymentAccountSelect('pb-payment-account', '', '-- Pilih Rekening Tujuan --');
   document.getElementById('pb-invoice-list').innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">Pilih outlet dulu di atas ↑</div>';
   document.getElementById('pb-match-summary').innerHTML = '';
   document.getElementById('paymentBatchModal').classList.add('open');
@@ -4920,18 +4927,22 @@ function savePaymentBatch() {
   const outletId = document.getElementById('pb-outlet').value;
   const date = document.getElementById('pb-date').value;
   const amount = parseFloat(document.getElementById('pb-amount').value) || 0;
+  const paymentAccountId = document.getElementById('pb-payment-account').value;
   const notes = document.getElementById('pb-notes').value.trim();
   const checked = Array.from(document.querySelectorAll('.pb-inv-checkbox:checked'));
 
   if (!outletId) { showToast('Pilih outlet dulu ya.'); return; }
   if (!date) { showToast('Isi tanggal transfer dulu ya.'); return; }
   if (!amount) { showToast('Isi nominal transfer dulu ya.'); return; }
+  if (!paymentAccountId) { showToast('Pilih dulu ditransfer ke rekening yang mana ya.'); return; }
   if (checked.length === 0) { showToast('Pilih minimal 1 invoice yang dibayar transfer ini.'); return; }
 
   const data = loadData();
   const invIds = checked.map(cb => Number(cb.value));
   const invNos = [];
   const invBreakdown = []; // {no, amount} per invoice — biar riwayat bisa nunjukin nominal per invoice
+  const paymentAccount = getPaymentAccountsList(data).find(a => String(a.id) === String(paymentAccountId));
+  const paymentAccountLabel = paymentAccount ? [paymentAccount.label, paymentAccount.bankName, paymentAccount.accountNumber].filter(Boolean).join(' · ') : '';
 
   invIds.forEach(id => {
     const inv = data.invs.find(i => i.id === id);
@@ -4940,6 +4951,7 @@ function savePaymentBatch() {
     inv.paidDate = date;
     inv.paidAmount = invAmount;
     inv.paidNotes = notes;
+    inv.paidToAccountId = paymentAccountId;
     inv.status = 'Lunas';
     invNos.push(inv.no);
     invBreakdown.push({ no: inv.no, amount: invAmount });
@@ -4951,6 +4963,8 @@ function savePaymentBatch() {
     date,
     customerId: outletId,
     amount,
+    paymentAccountId,
+    paymentAccountLabel,
     invNos,
     invBreakdown,
     notes
@@ -4971,7 +4985,7 @@ function renderPaymentHistory() {
   if (!tbody) return;
   const payments = data.payments || [];
   if (payments.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Belum ada riwayat pembayaran transfer.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted)">Belum ada riwayat pembayaran transfer.</td></tr>`;
     return;
   }
   // Terbaru di atas
@@ -4992,10 +5006,18 @@ function renderPaymentHistory() {
     } else {
       invListHtml = '-';
     }
+    // Data lama (sebelum kolom rekening ada) mungkin gak punya paymentAccountLabel tersimpan —
+    // coba cari ulang dari paymentAccountId, kalau gak ada juga baru tampil "-"
+    let accountLabel = p.paymentAccountLabel || '';
+    if (!accountLabel && p.paymentAccountId) {
+      const acc = getPaymentAccountsList(data).find(a => String(a.id) === String(p.paymentAccountId));
+      if (acc) accountLabel = [acc.label, acc.bankName, acc.accountNumber].filter(Boolean).join(' · ');
+    }
     return `<tr>
       <td>${fmtDate(p.date)}</td>
       <td>${outletName}</td>
       <td style="text-align:right;font-weight:600">${rupiah(p.amount)}</td>
+      <td style="font-size:12px">${accountLabel || '-'}</td>
       <td style="font-size:12px">${invListHtml}</td>
       <td style="font-size:12px;color:var(--text-muted)">${p.notes || '-'}</td>
       <td><button class="btn-icon" onclick="deletePaymentRecord(${p.id})" title="Hapus riwayat ini">🗑️</button></td>
