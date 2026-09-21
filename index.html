@@ -752,6 +752,8 @@
           <tbody id="inv-table"></tbody>
         </table>
         </div>
+        <div id="inv-filter-summary" style="display:flex; flex-wrap:wrap; gap:24px; align-items:center; justify-content:flex-end; padding:14px 20px; border-top:1px solid var(--border); background:var(--bg);">
+        </div>
       </div>
 
       <div class="table-card" style="margin-top:20px">
@@ -4947,6 +4949,29 @@ function renderInvs() {
 
   if (filterTerkirim) {
     list = list.filter(inv => filterTerkirim === 'terkirim' ? sentInvNos.has(inv.no) : !sentInvNos.has(inv.no));
+  }
+
+  // Ringkasan hasil filter: jumlah invoice, total nominal, dan sisa yang belum lunas
+  const summaryEl = document.getElementById('inv-filter-summary');
+  if (summaryEl) {
+    let sumTotal = 0;
+    let sumOutstanding = 0;
+    list.forEach(inv => {
+      const t = inv.items.reduce((sum, item) => sum + (item.qty * item.price), 0) - (inv.discount || 0);
+      sumTotal += t;
+      if (inv.status === 'Lunas') {
+        // lunas, tidak ada sisa
+      } else if (inv.status === 'Lunas Sebagian') {
+        sumOutstanding += Math.max(0, t - (inv.paidAmount || 0));
+      } else {
+        sumOutstanding += t;
+      }
+    });
+    summaryEl.innerHTML = `
+      <div style="font-size:13px;color:var(--text-muted);">Jumlah Invoice (filter): <strong style="color:var(--text);font-size:14px;">${list.length}</strong></div>
+      <div style="font-size:13px;color:var(--text-muted);">Total Nominal: <strong style="color:var(--text);font-size:14px;">${rupiah(sumTotal)}</strong></div>
+      <div style="font-size:13px;color:var(--text-muted);">Sisa Belum Lunas: <strong style="color:#d44;font-size:14px;">${rupiah(sumOutstanding)}</strong></div>
+    `;
   }
 
   tbody.innerHTML = list.map(inv => {
