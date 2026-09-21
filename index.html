@@ -690,6 +690,47 @@
         <button class="btn btn-success" onclick="exportTableToExcel('inv')">📤 Export Excel</button>
         <input type="text" id="inv-search" placeholder="🔍 Cari No Invoice / Customer / Ref SJ / Status..." oninput="renderInvs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
       </div>
+
+      <div class="dashboard-filter-bar" style="margin-bottom:14px;">
+        <div class="form-group">
+          <label>Dari Tanggal</label>
+          <input type="date" id="inv-filter-date-from" onchange="renderInvs()">
+        </div>
+        <div class="form-group">
+          <label>Sampai Tanggal</label>
+          <input type="date" id="inv-filter-date-to" onchange="renderInvs()">
+        </div>
+        <div class="form-group">
+          <label>Customer</label>
+          <select id="inv-filter-customer" onchange="renderInvs()">
+            <option value="">Semua Customer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="inv-filter-status" onchange="renderInvs()">
+            <option value="">Semua Status</option>
+            <option value="Draft">Draft</option>
+            <option value="Terbit">Terbit</option>
+            <option value="Lunas Sebagian">Lunas Sebagian</option>
+            <option value="Lunas">Lunas</option>
+            <option value="Jatuh Tempo">Jatuh Tempo (Overdue)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Terkirim</label>
+          <select id="inv-filter-terkirim" onchange="renderInvs()">
+            <option value="">Semua</option>
+            <option value="terkirim">✅ Terkirim</option>
+            <option value="belum">📮 Belum Kirim</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:0 0 auto; min-width:auto;">
+          <label>&nbsp;</label>
+          <button class="btn btn-sm" onclick="resetInvFilters()" style="white-space:nowrap;">↺ Reset Filter</button>
+        </div>
+      </div>
+
       <div class="table-card">
         <div class="table-scroll">
         <table>
@@ -4873,7 +4914,16 @@ function renderInvs() {
   const searchEl = document.getElementById('inv-search');
   const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
 
+  populateInvFilterCustomer(data);
+
+  const dateFrom = document.getElementById('inv-filter-date-from')?.value || '';
+  const dateTo = document.getElementById('inv-filter-date-to')?.value || '';
+  const filterCustomer = document.getElementById('inv-filter-customer')?.value || '';
+  const filterStatus = document.getElementById('inv-filter-status')?.value || '';
+  const filterTerkirim = document.getElementById('inv-filter-terkirim')?.value || '';
+
   let list = [...data.invs].reverse();
+
   if (q) {
     list = list.filter(inv => {
       const customer = (data.customers.find(c => c.id == inv.customer)?.name || '').toLowerCase();
@@ -4881,6 +4931,22 @@ function renderInvs() {
       return (inv.no || '').toLowerCase().includes(q) || customer.includes(q) ||
         soNosStr.includes(q) || (inv.status || '').toLowerCase().includes(q);
     });
+  }
+
+  if (dateFrom) list = list.filter(inv => inv.date && inv.date >= dateFrom);
+  if (dateTo) list = list.filter(inv => inv.date && inv.date <= dateTo);
+  if (filterCustomer) list = list.filter(inv => inv.customer == filterCustomer);
+
+  if (filterStatus) {
+    if (filterStatus === 'Jatuh Tempo') {
+      list = list.filter(inv => inv.status !== 'Lunas' && inv.status !== 'Lunas Sebagian' && inv.due && inv.due < todayStr);
+    } else {
+      list = list.filter(inv => (inv.status || 'Draft') === filterStatus);
+    }
+  }
+
+  if (filterTerkirim) {
+    list = list.filter(inv => filterTerkirim === 'terkirim' ? sentInvNos.has(inv.no) : !sentInvNos.has(inv.no));
   }
 
   tbody.innerHTML = list.map(inv => {
@@ -4937,6 +5003,35 @@ function renderInvs() {
       </td>
     </tr>`;
   }).join('');
+}
+
+function populateInvFilterCustomer(data) {
+  const select = document.getElementById('inv-filter-customer');
+  if (!select) return;
+  const currentVal = select.value;
+  const usedIds = new Set((data.invs || []).map(inv => String(inv.customer)));
+  const options = data.customers
+    .filter(c => usedIds.has(String(c.id)))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => `<option value="${c.id}">${c.name}</option>`)
+    .join('');
+  const newHtml = `<option value="">Semua Customer</option>${options}`;
+  if (select.dataset.optionsCache !== newHtml) {
+    select.innerHTML = newHtml;
+    select.dataset.optionsCache = newHtml;
+    select.value = currentVal;
+  }
+}
+
+function resetInvFilters() {
+  document.getElementById('inv-filter-date-from').value = '';
+  document.getElementById('inv-filter-date-to').value = '';
+  document.getElementById('inv-filter-customer').value = '';
+  document.getElementById('inv-filter-status').value = '';
+  document.getElementById('inv-filter-terkirim').value = '';
+  const searchEl = document.getElementById('inv-search');
+  if (searchEl) searchEl.value = '';
+  renderInvs();
 }
 
 function addDays(dateStr, days) {
