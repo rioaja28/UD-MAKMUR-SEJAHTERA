@@ -472,6 +472,10 @@
           <label>&nbsp;</label>
           <button class="btn btn-outline" onclick="resetDashboardFilter()">✕ Reset Filter</button>
         </div>
+        <div class="form-group" style="flex:0 0 auto;min-width:0;">
+          <label>&nbsp;</label>
+          <button class="btn btn-outline" onclick="runInvoiceAudit()">🔍 Cek Selisih Omset/Piutang</button>
+        </div>
       </div>
 
       <div class="stats-grid-4" id="dashboardStatsRow1"></div>
@@ -1769,6 +1773,22 @@
       <button class="btn btn-success" onclick="printDoc('sttpPdfContent')">🖨️ Cetak (Dot Matrix)</button>
       <button class="btn btn-pdf" onclick="downloadDotMatrixPDF('sttpPdfContent')">⬇️ PDF Dot Matrix</button>
       <button class="btn btn-primary" onclick="downloadSttpPDF()">⬇️ Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- AUDIT SELISIH OMSET/PIUTANG MODAL -->
+<div class="modal-overlay" id="auditModal">
+  <div class="modal" style="max-width: 760px;">
+    <div class="modal-header">
+      <div class="modal-title">🔍 Audit Selisih Omset / Piutang / Lunas</div>
+      <button class="modal-close" onclick="closeModal('auditModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="audit-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('auditModal')">Tutup</button>
     </div>
   </div>
 </div>
@@ -5642,6 +5662,83 @@ function repairInvPaymentData(data) {
   });
   if (changed) autoSyncSttpLunasStatus(data);
   return changed;
+}
+
+// Audit manual yang bisa dipanggil user kapan aja lewat tombol di Dashboard,
+// buat nemuin invoice mana persisnya yang bikin Omset ga sama dengan
+// Total Dibayar + Total Piutang, atau invoice yang nempel di >1 Tanda Terima.
+function runInvoiceAudit() {
+  const data = loadData();
+  const issues = [];
+
+  // 1. Invoice "Lunas" tapi nominal yang tercatat dibayar beda dari total tagihan saat ini
+  data.invs.forEach(inv => {
+    const total = invTotal(inv);
+    const paid = inv.paidAmount || 0;
+    const customer = data.customers.find(c => c.id == inv.customer)?.name || '-';
+    if (inv.status === 'Lunas' && Math.abs(paid - total) > 1) {
+      issues.push({
+        type: paid < total ? 'kurang' : 'lebih',
+        text: `<strong>${inv.no}</strong> (${customer}) — status Lunas, tapi tercatat dibayar ${rupiah(paid)} dari total ${rupiah(total)} <span style="color:#d44">(selisih ${rupiah(total - paid)})</span>`
+      });
+    }
+    // 2. Status invalid/kosong (bekas kena bug lama)
+    if (!['Draft', 'Terbit', 'Lunas Sebagian', 'Lunas'].includes(inv.status)) {
+      issues.push({ type: 'status', text: `<strong>${inv.no}</strong> (${customer}) — status invoice kosong/rusak: "${inv.status}"` });
+    }
+  });
+
+  // 3. Nomor invoice yang duplikat (kesimpen 2x dengan No yang sama)
+  const byNo = {};
+  data.invs.forEach(inv => { (byNo[inv.no] = byNo[inv.no] || []).push(inv); });
+  Object.entries(byNo).forEach(([no, list]) => {
+    if (list.length > 1) {
+      issues.push({ type: 'duplikat-inv', text: `<strong>${no}</strong> — kesimpen ${list.length}x sebagai invoice terpisah (total masing-masing: ${list.map(i => rupiah(invTotal(i))).join(', ')})` });
+    }
+  });
+
+  // 4. Invoice yang nempel di lebih dari 1 Tanda Terima
+  const sttpCountByInvNo = {};
+  (data.sttps || []).forEach(s => {
+    const nos = Array.isArray(s.invNos) && s.invNos.length > 0 ? s.invNos : (s.invNo ? [s.invNo] : []);
+    nos.forEach(no => {
+      (sttpCountByInvNo[no] = sttpCountByInvNo[no] || []).push(s.no);
+    });
+  });
+  Object.entries(sttpCountByInvNo).forEach(([invNo, sttpNos]) => {
+    if (sttpNos.length > 1) {
+      issues.push({ type: 'duplikat-sttp', text: `Invoice <strong>${invNo}</strong> nempel di ${sttpNos.length} Tanda Terima sekaligus: ${sttpNos.join(', ')}` });
+    }
+  });
+
+  const box = document.getElementById('audit-content');
+  if (issues.length === 0) {
+    box.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text-muted)">✅ Gak ketemu kejanggalan. Semua invoice & Tanda Terima udah sinkron.</div>`;
+  } else {
+    const grouped = {
+      kurang: issues.filter(i => i.type === 'kurang'),
+      lebih: issues.filter(i => i.type === 'lebih'),
+      status: issues.filter(i => i.type === 'status'),
+      'duplikat-inv': issues.filter(i => i.type === 'duplikat-inv'),
+      'duplikat-sttp': issues.filter(i => i.type === 'duplikat-sttp')
+    };
+    const section = (title, list) => list.length === 0 ? '' : `
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px">${title} (${list.length})</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${list.map(i => `<div style="font-size:13px;background:var(--bg);padding:8px 10px;border-radius:8px">${i.text}</div>`).join('')}
+        </div>
+      </div>`;
+    box.innerHTML = `
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Ketemu ${issues.length} kejanggalan. Ini kemungkinan besar penyebab selisih Omset/Piutang/Lunas:</div>
+      ${section('⚠️ Lunas tapi kurang bayar (ini yang bikin selisih)', grouped.kurang)}
+      ${section('ℹ️ Lunas tapi lebih bayar', grouped.lebih)}
+      ${section('🛠️ Status invoice rusak', grouped.status)}
+      ${section('📄 Nomor Invoice duplikat', grouped['duplikat-inv'])}
+      ${section('🧾 Invoice double di Tanda Terima', grouped['duplikat-sttp'])}
+    `;
+  }
+  document.getElementById('auditModal').classList.add('open');
 }
 
 function renderDashboard() {
