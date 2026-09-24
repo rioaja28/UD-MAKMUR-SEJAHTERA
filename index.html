@@ -1419,6 +1419,7 @@
         <select id="inv-status">
           <option value="Draft">Draft</option>
           <option value="Terbit">Terbit</option>
+          <option value="Lunas Sebagian">Lunas Sebagian</option>
           <option value="Lunas">Lunas</option>
         </select>
       </div>
@@ -4859,6 +4860,7 @@ function saveInv() {
     inv.soNos = soRefs.map(s => s.no);
     inv.soId = soRefIds[0] || null;
     inv.soNo = soRefs[0] ? soRefs[0].no : null;
+    syncInvPaidFieldsWithStatus(inv);
     logActivity(data, 'Invoice', 'Edit', `Merevisi Invoice ${inv.no}`);
     showToast('Invoice berhasil direvisi!');
   } else {
@@ -4878,6 +4880,7 @@ function saveInv() {
       soId: soRefIds[0] || null,
       soNo: soRefs[0] ? soRefs[0].no : null
     };
+    syncInvPaidFieldsWithStatus(inv);
     data.invs.push(inv);
     logActivity(data, 'Invoice', 'Tambah', `Membuat Invoice ${inv.no}`);
     showToast('Invoice berhasil disimpan!');
@@ -5575,6 +5578,70 @@ function filterPOsByDashboard(pos, f) {
 
 function invTotal(inv) {
   return inv.items.reduce((s, i) => s + i.qty * i.price, 0) - (inv.discount || 0);
+}
+
+// Jagain nominal "sudah dibayar" tetep sinkron sama status invoice, biar
+// Omset = Total Dibayar + Total Piutang selalu balance. Dipanggil tiap kali
+// invoice disimpan (baru maupun revisi).
+function syncInvPaidFieldsWithStatus(inv) {
+  const total = invTotal(inv);
+  if (inv.status === 'Lunas') {
+    // Kalau ditandai Lunas manual dari dropdown form (bukan lewat modal
+    // "Konfirmasi Pembayaran"), paidAmount bisa aja belum ke-set atau udah basi
+    // (misal invoice-nya direvisi setelah dibayar). Samain ke total saat ini.
+    inv.paidAmount = total;
+    if (!inv.paidDate) inv.paidDate = today();
+  } else if (inv.status === 'Lunas Sebagian') {
+    // Kalau invoice direvisi jadi lebih kecil dari nominal yang udah kebayar,
+    // jangan sampai sisa piutang jadi minus.
+    if ((inv.paidAmount || 0) >= total) inv.paidAmount = total;
+  } else {
+    // Draft / Terbit dianggap belum ada pembayaran yang tercatat
+    delete inv.paidAmount;
+    delete inv.paidDate;
+    delete inv.paidNotes;
+  }
+}
+
+// Perbaikan sekali jalan buat data invoice lama yang kena bug status ke-reset
+// (invoice "Lunas Sebagian" yang diedit ulang jadi ilang statusnya, atau invoice
+// yang ditandai "Lunas" manual dari dropdown tanpa nominal dibayar ke-catet).
+// Ini yang bikin Omset, Piutang, dan Lunas ga nyambung di dashboard.
+// Dipanggil sekali tiap kali app dibuka. Return true kalau ada data yang dibetulin.
+function repairInvPaymentData(data) {
+  let changed = false;
+  (data.invs || []).forEach(inv => {
+    const total = invTotal(inv);
+    const validStatuses = ['Draft', 'Terbit', 'Lunas Sebagian', 'Lunas'];
+
+    // 1. Status kosong/rusak (bekas ke-reset) — tebak ulang dari nominal yang tercatat dibayar
+    if (!validStatuses.includes(inv.status)) {
+      if ((inv.paidAmount || 0) >= total - 1 && inv.paidAmount > 0) {
+        inv.status = 'Lunas';
+      } else if ((inv.paidAmount || 0) > 0) {
+        inv.status = 'Lunas Sebagian';
+      } else {
+        inv.status = 'Draft';
+      }
+      changed = true;
+    }
+
+    // 2. Ditandai "Lunas" tapi nominal dibayarnya ga match total (belum ke-catet / basi)
+    if (inv.status === 'Lunas' && Math.abs((inv.paidAmount || 0) - total) > 1) {
+      inv.paidAmount = total;
+      if (!inv.paidDate) inv.paidDate = inv.date || today();
+      changed = true;
+    }
+
+    // 3. "Lunas Sebagian" tapi nominal dibayar >= total (harusnya udah full Lunas)
+    if (inv.status === 'Lunas Sebagian' && (inv.paidAmount || 0) >= total - 1) {
+      inv.status = 'Lunas';
+      inv.paidAmount = total;
+      changed = true;
+    }
+  });
+  if (changed) autoSyncSttpLunasStatus(data);
+  return changed;
 }
 
 function renderDashboard() {
@@ -7277,8 +7344,20 @@ function onSttpCustomerChange(preselectedNos) {
   } else {
     addrEl.style.display = 'none';
   }
-  // Filter invoices by selected customer
-  const custInvs = data.invs.filter(inv => String(inv.customer) === String(custId));
+
+  // Cegah 1 invoice ke-lampir di lebih dari 1 Tanda Terima ("double"). Invoice
+  // yang udah nempel di Tanda Terima LAIN (bukan yang lagi diedit sekarang)
+  // disembunyikan dari daftar pilihan.
+  const editId = document.getElementById('sttp-edit-id').value;
+  const usedElsewhere = new Set();
+  (data.sttps || []).forEach(s => {
+    if (editId && String(s.id) === String(editId)) return; // punya STTP yang lagi diedit sendiri, boleh tetap kepilih
+    const nos = Array.isArray(s.invNos) && s.invNos.length > 0 ? s.invNos : (s.invNo ? [s.invNo] : []);
+    nos.forEach(no => usedElsewhere.add(no));
+  });
+
+  // Filter invoices by selected customer, buang yang udah kepake di Tanda Terima lain
+  const custInvs = data.invs.filter(inv => String(inv.customer) === String(custId) && !usedElsewhere.has(inv.no));
   renderSttpInvCheckboxes(custInvs, preselectedNos || []);
 }
 
@@ -7298,7 +7377,22 @@ function saveSttp() {
   const data = loadData();
   if (!data.sttps) data.sttps = [];
   const editId = document.getElementById('sttp-edit-id').value;
-  const invNos = getSelectedSttpInvNos();
+  let invNos = getSelectedSttpInvNos();
+
+  // Lapis pengaman kedua: buang invoice yang ternyata udah kepake di Tanda Terima LAIN,
+  // jaga-jaga kalau daftar checkbox-nya sempat basi pas disimpan.
+  const usedElsewhere = new Set();
+  data.sttps.forEach(s => {
+    if (editId && String(s.id) === String(editId)) return;
+    const nos = Array.isArray(s.invNos) && s.invNos.length > 0 ? s.invNos : (s.invNo ? [s.invNo] : []);
+    nos.forEach(no => usedElsewhere.add(no));
+  });
+  const dupNos = invNos.filter(no => usedElsewhere.has(no));
+  if (dupNos.length > 0) {
+    showToast(`${dupNos.join(', ')} udah kepake di Tanda Terima lain, otomatis dilewatin.`);
+    invNos = invNos.filter(no => !usedElsewhere.has(no));
+  }
+
   const existing = editId ? data.sttps.find(s => s.id === editId) : null;
   const sttp = {
     id: editId || ('sttp_' + Date.now()),
@@ -8300,6 +8394,7 @@ function showLoginScreen(onSuccess) {
 
 function startApp() {
   const _data = loadData();
+  if (repairInvPaymentData(_data)) saveData(_data);
   if (_data.profile?.name) {
     document.getElementById('userName').textContent = _data.profile.name;
     document.getElementById('userAvatar').textContent = _data.profile.name.charAt(0).toUpperCase();
