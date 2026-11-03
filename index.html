@@ -171,6 +171,13 @@
   td { padding: 13px 16px; font-size: 13px; border-bottom: 1px solid var(--border); color: var(--text); }
   tr:last-child td { border-bottom: none; }
   tr:hover td { background: var(--bg); }
+  /* ===== Filter per kolom (Surat Jalan) ===== */
+  .col-filter-row th { padding: 8px 10px 10px; background: var(--card-bg); text-transform: none; letter-spacing: 0; font-weight: 400; vertical-align: top; }
+  .col-filter-row input, .col-filter-row select { padding: 7px 9px; font-size: 12px; min-width: 96px; border-radius: 8px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .col-filter-row input.filter-active, .col-filter-row select.filter-active { border-color: var(--primary, #6C5CE7); background: rgba(108,92,231,0.06); }
+  .so-filter-info { font-size: 12px; color: var(--text-muted); align-self: center; white-space: nowrap; }
+  .so-empty-row td { text-align: center; color: var(--text-muted); padding: 28px 16px; }
+  @media (max-width: 768px) { #so .table-scroll table { min-width: 900px; } }
   .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
   .badge-purple { background: var(--purple-light); color: var(--purple); }
@@ -665,6 +672,8 @@
         <button class="btn btn-primary" onclick="openSOModal()">+ Buat Surat Jalan</button>
         <button class="btn btn-success" onclick="exportTableToExcel('so')">📤 Export Excel</button>
         <input type="text" id="so-search" placeholder="🔍 Cari No SJ / Customer / Ref PO / Status..." oninput="renderSOs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
+        <button class="btn btn-outline" id="so-reset-filter" onclick="resetSOFilters()" title="Hapus semua filter">↺ Reset Filter</button>
+        <span class="so-filter-info" id="so-filter-info"></span>
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -678,6 +687,15 @@
               <th>Total Item</th>
               <th>Status</th>
               <th>Aksi</th>
+            </tr>
+            <tr class="col-filter-row">
+              <th><input type="text" id="so-f-no" placeholder="Filter No..." autocomplete="off" oninput="renderSOs()"></th>
+              <th><select id="so-f-customer" onchange="renderSOs()"><option value="">Semua Customer</option></select></th>
+              <th><input type="text" id="so-f-po" placeholder="Filter Ref PO..." autocomplete="off" oninput="renderSOs()"></th>
+              <th><input type="text" id="so-f-date" placeholder="mis. 3/11/2026" autocomplete="off" oninput="renderSOs()" title="Bisa diketik: 2026-11-03, 03/11/2026, 11/2026, atau 3 November 2026"></th>
+              <th><input type="text" id="so-f-items" placeholder="mis. 3, &gt;5, 2-4" autocomplete="off" oninput="renderSOs()" title="Angka pas (3), operator (&gt;5, &lt;=2), atau rentang (2-4)"></th>
+              <th><input type="text" id="so-f-status" list="so-f-status-list" placeholder="Dikirim / Selesai" autocomplete="off" oninput="renderSOs()"><datalist id="so-f-status-list"><option value="Dikirim"><option value="Selesai"></datalist></th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="so-table"></tbody>
@@ -4431,11 +4449,118 @@ function saveSO() {
   resetSOModal();
 }
 
+// ===== FILTER PER KOLOM — SURAT JALAN =====
+const SO_FILTER_IDS = ['so-f-no', 'so-f-customer', 'so-f-po', 'so-f-date', 'so-f-items', 'so-f-status'];
+
+function getSOCustomerName(data, so) {
+  return (data.customers.find(c => c.id == so.customer)?.name || 'Unknown').trim();
+}
+
+// Dropdown Customer: nama unik dari data Surat Jalan (dinamis, bukan ketikan manual)
+function populateSOCustomerFilter(data) {
+  const sel = document.getElementById('so-f-customer');
+  if (!sel) return;
+  const names = [...new Set(data.sos.map(so => getSOCustomerName(data, so)))]
+    .sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
+  const key = names.join('\u0001');
+  if (sel.dataset.key === key) return; // daftar tidak berubah, jangan bangun ulang
+  const prev = sel.value;
+  sel.innerHTML = '';
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = 'Semua Customer';
+  sel.appendChild(all);
+  names.forEach(n => {
+    const o = document.createElement('option');
+    o.value = n;
+    o.textContent = n;
+    sel.appendChild(o);
+  });
+  sel.dataset.key = key;
+  sel.value = names.includes(prev) ? prev : ''; // pilihan lama dipertahankan kalau masih ada
+}
+
+function getSOColumnFilters() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  return {
+    no: v('so-f-no').toLowerCase(),
+    customer: v('so-f-customer'),
+    po: v('so-f-po').toLowerCase(),
+    date: v('so-f-date').toLowerCase(),
+    items: v('so-f-items'),
+    status: v('so-f-status').toLowerCase()
+  };
+}
+
+// Tanggal: cocok dengan format ISO (2026-11-03), 3/11/2026, 03/11/2026, 03-11-2026, atau "3 November 2026"
+function matchSODate(dateStr, q) {
+  if (!dateStr) return false;
+  const cands = [String(dateStr)];
+  try {
+    const d = parseLocalDate(dateStr);
+    const dd = String(d.getDate()).padStart(2, '0'), mm = String(d.getMonth() + 1).padStart(2, '0'), yy = d.getFullYear();
+    cands.push(fmtDate(dateStr), `${dd}/${mm}/${yy}`, `${dd}-${mm}-${yy}`, fmtDateIndo(dateStr));
+  } catch (e) { /* abaikan, pakai kandidat yang ada */ }
+  return cands.some(c => String(c).toLowerCase().includes(q));
+}
+
+// Total Item: angka pas (3), operator (>5, >=2, <4, <=3), atau rentang (2-4)
+function matchSOItemCount(count, raw) {
+  const q = raw.replace(/\s+/g, '');
+  if (!q) return true;
+  if (/^(>=|<=|>|<|=)$|^\d+-$/.test(q)) return true; // masih mengetik, jangan kosongkan tabel dulu
+  let m = q.match(/^(>=|<=|>|<|=)?(\d+)$/);
+  if (m) {
+    const n = +m[2];
+    switch (m[1]) {
+      case '>': return count > n;
+      case '>=': return count >= n;
+      case '<': return count < n;
+      case '<=': return count <= n;
+      default: return count === n;
+    }
+  }
+  m = q.match(/^(\d+)-(\d+)$/);
+  if (m) {
+    const a = +m[1], b = +m[2];
+    return count >= Math.min(a, b) && count <= Math.max(a, b);
+  }
+  return false;
+}
+
+function updateSOFilterUI(shown, total) {
+  let active = false;
+  SO_FILTER_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const on = el.value.trim() !== '';
+    el.classList.toggle('filter-active', on);
+    if (on) active = true;
+  });
+  const search = document.getElementById('so-search');
+  if (search && search.value.trim()) active = true;
+  const info = document.getElementById('so-filter-info');
+  if (info) info.textContent = active ? `Menampilkan ${shown} dari ${total}` : `${total} Surat Jalan`;
+  const btn = document.getElementById('so-reset-filter');
+  if (btn) btn.style.opacity = active ? '1' : '0.55';
+}
+
+function resetSOFilters() {
+  SO_FILTER_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const search = document.getElementById('so-search');
+  if (search) search.value = '';
+  renderSOs();
+}
+
 function renderSOs() {
   const data = loadData();
   const tbody = document.getElementById('so-table');
   const searchEl = document.getElementById('so-search');
   const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+
+  // Isi dropdown Customer secara dinamis dari data Surat Jalan, lalu baca semua filter kolom
+  populateSOCustomerFilter(data);
+  const f = getSOColumnFilters();
 
   let list = [...data.sos].reverse();
   if (q) {
@@ -4444,6 +4569,22 @@ function renderSOs() {
       return (so.no || '').toLowerCase().includes(q) || customer.includes(q) ||
         (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q);
     });
+  }
+  // Filter per kolom (semua aktif bersamaan = AND)
+  list = list.filter(so => {
+    if (f.no && !(so.no || '').toLowerCase().includes(f.no)) return false;
+    if (f.customer && getSOCustomerName(data, so) !== f.customer) return false;
+    if (f.po && !(so.poNo || '').toLowerCase().includes(f.po)) return false;
+    if (f.date && !matchSODate(so.date, f.date)) return false;
+    if (f.items && !matchSOItemCount((so.items || []).length, f.items)) return false;
+    if (f.status && !(so.status || '').toLowerCase().includes(f.status)) return false;
+    return true;
+  });
+  updateSOFilterUI(list.length, data.sos.length);
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr class="so-empty-row"><td colspan="7">${data.sos.length ? 'Tidak ada Surat Jalan yang cocok dengan filter.' : 'Belum ada Surat Jalan.'}</td></tr>`;
+    return;
   }
 
   tbody.innerHTML = list.map(so => {
