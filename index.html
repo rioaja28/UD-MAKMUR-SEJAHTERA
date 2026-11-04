@@ -206,7 +206,8 @@
   .wk-outlet { font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
   .wk-outlet small { display: block; font-size: 11.5px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
   .wk-amt { text-align: right; font-weight: 700; white-space: nowrap; }
-  .wk-total { position: sticky; bottom: 12px; z-index: 5; margin-top: 16px; background: linear-gradient(135deg, var(--purple), #8A7CF0); color: #fff; border-radius: var(--radius); padding: 16px 22px; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; box-shadow: var(--shadow-lift); }
+  .wk-total { position: sticky; bottom: 12px; z-index: 5; margin-top: 16px; background: linear-gradient(135deg, var(--purple), #8A7CF0); color: #fff; border-radius: var(--radius); padding: 16px 22px; display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 16px; box-shadow: var(--shadow-lift); }
+  .wk-total .wk-t-main { text-align: right; }
   .wk-total .wk-t-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; opacity: 0.85; }
   .wk-total .wk-t-value { font-size: 20px; font-weight: 800; margin-top: 4px; letter-spacing: -0.3px; }
   .wk-total .wk-t-main .wk-t-value { font-size: 24px; }
@@ -221,7 +222,7 @@
     .wk-row > [data-label]::before { content: attr(data-label); display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); font-weight: 700; margin-bottom: 1px; }
     .wk-row > .wk-amt { grid-column: 1 / -1; text-align: left; font-size: 14px; }
     .wk-total { grid-template-columns: 1fr 1fr; padding: 14px 16px; bottom: 8px; }
-    .wk-total .wk-t-main { grid-column: 1 / -1; }
+    .wk-total .wk-t-main { grid-column: 1 / -1; order: -1; text-align: left; }
     .wk-total .wk-t-main .wk-t-value { font-size: 21px; }
   }
   /* ===== Date picker (kalender) untuk filter tanggal ===== */
@@ -4663,9 +4664,9 @@ function renderWeekly() {
   }).join('');
 
   document.getElementById('wk-total').innerHTML = `
-    <div class="wk-t-main"><div class="wk-t-label">Total Nominal Pengiriman 1 Minggu</div><div class="wk-t-value">${rupiah(report.total)}</div></div>
     <div><div class="wk-t-label">Total Outlet Penerima</div><div class="wk-t-value">${report.outlets}</div></div>
-    <div><div class="wk-t-label">Total Surat Jalan</div><div class="wk-t-value">${report.sjCount}</div></div>`;
+    <div><div class="wk-t-label">Total Surat Jalan</div><div class="wk-t-value">${report.sjCount}</div></div>
+    <div class="wk-t-main"><div class="wk-t-label">Total Nominal Pengiriman 1 Minggu</div><div class="wk-t-value">${rupiah(report.total)}</div></div>`;
 }
 
 function weeklyToggle(iso) {
