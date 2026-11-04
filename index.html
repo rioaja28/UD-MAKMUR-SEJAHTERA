@@ -177,7 +177,27 @@
   .col-filter-row input.filter-active, .col-filter-row select.filter-active { border-color: var(--primary, #6C5CE7); background: rgba(108,92,231,0.06); }
   .so-filter-info { font-size: 12px; color: var(--text-muted); align-self: center; white-space: nowrap; }
   .so-empty-row td { text-align: center; color: var(--text-muted); padding: 28px 16px; }
-  @media (max-width: 768px) { #so .table-scroll table { min-width: 900px; } }
+  @media (max-width: 768px) { #so .table-scroll table { min-width: 900px; } #po .table-scroll table { min-width: 760px; } #inv .table-scroll table { min-width: 1180px; } }
+  /* ===== Date picker (kalender) untuk filter tanggal ===== */
+  .col-filter-row input.sdp-input { cursor: pointer; min-width: 112px; }
+  .sdp-popup { position: fixed; z-index: 10000; width: 280px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 20px 60px -12px rgba(21,21,43,0.35); padding: 12px; -webkit-user-select: none; user-select: none; text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .sdp-head { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+  .sdp-head button { width: 28px; height: 28px; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text); line-height: 1; padding: 0; }
+  .sdp-head button:hover { background: var(--purple-light); color: var(--purple); }
+  .sdp-title { flex: 1; text-align: center; font-size: 13px; font-weight: 700; color: var(--text); }
+  .sdp-dow, .sdp-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .sdp-dow span { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 4px 0; }
+  .sdp-cell { height: 34px; }
+  .sdp-day { border: none; background: transparent; font-size: 12.5px; color: var(--text); cursor: pointer; border-radius: 8px; font-family: inherit; padding: 0; }
+  .sdp-day.weekend { color: var(--coral); }
+  .sdp-day:hover { background: var(--purple-light); color: var(--purple); }
+  .sdp-day.today { box-shadow: inset 0 0 0 1.5px var(--purple); }
+  .sdp-day.selected, .sdp-day.selected:hover { background: var(--purple); color: #fff; font-weight: 700; }
+  .sdp-foot { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .sdp-foot button { border: none; background: transparent; font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 8px; border-radius: 8px; font-family: inherit; }
+  .sdp-foot button:hover { background: var(--bg); }
+  .sdp-foot .sdp-today { color: var(--purple); }
+  .sdp-foot .sdp-clear { color: var(--coral); }
   .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 11px; border-radius: 20px; font-size: 11px; font-weight: 600; }
   .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
   .badge-purple { background: var(--purple-light); color: var(--purple); }
@@ -621,6 +641,8 @@
         <button class="btn btn-primary" onclick="openPOModal()">+ Buat PO</button>
         <button class="btn btn-success" onclick="exportTableToExcel('po')">📤 Export Excel</button>
         <input type="text" id="po-search" placeholder="🔍 Cari No PO / Outlet / Status..." oninput="renderPOs()" style="flex:1; min-width:200px; padding:8px 12px; border-radius:8px; border:1px solid var(--border, #ccc);">
+        <button class="btn btn-outline" id="po-reset-filter" onclick="resetPOFilters()" title="Hapus semua filter">↺ Reset Filter</button>
+        <span class="so-filter-info" id="po-filter-info"></span>
       </div>
       <div class="table-card">
         <div class="table-scroll">
@@ -633,6 +655,14 @@
               <th>Total</th>
               <th>Status</th>
               <th>Aksi</th>
+            </tr>
+            <tr class="col-filter-row">
+              <th><input type="text" id="po-f-no" placeholder="Filter No PO..." autocomplete="off" oninput="renderPOs()"></th>
+              <th><select id="po-f-supplier" onchange="renderPOs()"><option value="">Semua Outlet</option></select></th>
+              <th><input type="text" class="sdp-input" id="po-f-date" readonly placeholder="📅 DD/MM/YYYY" autocomplete="off" oninput="renderPOs()" title="Klik untuk memilih tanggal"></th>
+              <th></th>
+              <th><input type="text" id="po-f-status" list="po-f-status-list" placeholder="Draft / Diproses / Selesai" autocomplete="off" oninput="renderPOs()"><datalist id="po-f-status-list"><option value="Draft"><option value="Diproses"><option value="Selesai"></datalist></th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="po-table"></tbody>
@@ -692,7 +722,7 @@
               <th><input type="text" id="so-f-no" placeholder="Filter No..." autocomplete="off" oninput="renderSOs()"></th>
               <th><select id="so-f-customer" onchange="renderSOs()"><option value="">Semua Customer</option></select></th>
               <th><input type="text" id="so-f-po" placeholder="Filter Ref PO..." autocomplete="off" oninput="renderSOs()"></th>
-              <th><input type="text" id="so-f-date" placeholder="mis. 3/11/2026" autocomplete="off" oninput="renderSOs()" title="Bisa diketik: 2026-11-03, 03/11/2026, 11/2026, atau 3 November 2026"></th>
+              <th><input type="text" class="sdp-input" id="so-f-date" readonly placeholder="📅 DD/MM/YYYY" autocomplete="off" oninput="renderSOs()" title="Klik untuk memilih tanggal"></th>
               <th><input type="text" id="so-f-items" placeholder="mis. 3, &gt;5, 2-4" autocomplete="off" oninput="renderSOs()" title="Angka pas (3), operator (&gt;5, &lt;=2), atau rentang (2-4)"></th>
               <th><input type="text" id="so-f-status" list="so-f-status-list" placeholder="Dikirim / Selesai" autocomplete="off" oninput="renderSOs()"><datalist id="so-f-status-list"><option value="Dikirim"><option value="Selesai"></datalist></th>
               <th></th>
@@ -721,23 +751,6 @@
         <div class="form-group">
           <label>Sampai Tanggal</label>
           <input type="date" id="inv-filter-date-to" onchange="renderInvs()">
-        </div>
-        <div class="form-group">
-          <label>Customer</label>
-          <select id="inv-filter-customer" onchange="renderInvs()">
-            <option value="">Semua Customer</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Status</label>
-          <select id="inv-filter-status" onchange="renderInvs()">
-            <option value="">Semua Status</option>
-            <option value="Draft">Draft</option>
-            <option value="Terbit">Terbit</option>
-            <option value="Lunas Sebagian">Lunas Sebagian</option>
-            <option value="Lunas">Lunas</option>
-            <option value="Jatuh Tempo">Jatuh Tempo (Overdue)</option>
-          </select>
         </div>
         <div class="form-group">
           <label>Terkirim</label>
@@ -769,7 +782,27 @@
               <th>Terkirim</th>
               <th>Aksi</th>
             </tr>
-
+            <tr class="col-filter-row">
+              <th><input type="text" id="inv-f-no" placeholder="Filter No Invoice..." autocomplete="off" oninput="renderInvs()"></th>
+              <th><select id="inv-filter-customer" onchange="renderInvs()"><option value="">Semua Customer</option></select></th>
+              <th><input type="text" id="inv-f-ref" placeholder="Filter Ref SJ..." autocomplete="off" oninput="renderInvs()"></th>
+              <th><input type="text" class="sdp-input" id="inv-f-date" readonly placeholder="📅 DD/MM/YYYY" autocomplete="off" oninput="renderInvs()" title="Klik untuk memilih tanggal"></th>
+              <th></th>
+              <th></th>
+              <th></th>
+              <th>
+                <select id="inv-filter-status" onchange="renderInvs()">
+                  <option value="">Semua Status</option>
+                  <option value="Draft">Draft</option>
+                  <option value="Terbit">Terbit</option>
+                  <option value="Lunas Sebagian">Lunas Sebagian</option>
+                  <option value="Lunas">Lunas</option>
+                  <option value="Jatuh Tempo">Jatuh Tempo (Overdue)</option>
+                </select>
+              </th>
+              <th></th>
+              <th></th>
+            </tr>
           </thead>
           <tbody id="inv-table"></tbody>
         </table>
@@ -4047,6 +4080,8 @@ function savePO() {
       status: document.getElementById('po-status').value || 'Draft'
     };
     data.pos.push(po);
+    // Data baru harus langsung kelihatan: bersihkan filter kolom & pencarian yang mungkin menyembunyikannya
+    clearColumnFilterEls(PO_FILTER_IDS); const _poSearch = document.getElementById('po-search'); if (_poSearch) _poSearch.value = '';
     logActivity(data, 'PO', 'Tambah', `Membuat PO ${po.no}`);
     showToast('PO berhasil disimpan!');
   }
@@ -4069,6 +4104,23 @@ function renderPOs() {
       const supplier = (data.customers.find(c => c.id == po.supplier)?.name || '').toLowerCase();
       return (po.no || '').toLowerCase().includes(q) || supplier.includes(q) || (po.status || '').toLowerCase().includes(q);
     });
+  }
+
+  // Filter per kolom (semua aktif bersamaan = AND)
+  populateUniqueSelect('po-f-supplier', data.pos.map(po => getPOSupplierName(data, po)), 'Semua Outlet');
+  const pf = getPOColumnFilters();
+  list = list.filter(po => {
+    if (pf.no && !(po.no || '').toLowerCase().includes(pf.no)) return false;
+    if (pf.supplier && getPOSupplierName(data, po) !== pf.supplier) return false;
+    if (pf.date && !sameDateISO(po.date, pf.date)) return false;
+    if (pf.status && !(po.status || '').toLowerCase().includes(pf.status)) return false;
+    return true;
+  });
+  updatePOFilterUI(list.length, data.pos.length);
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr class="so-empty-row"><td colspan="6">${data.pos.length ? 'Tidak ada PO yang cocok dengan filter.' : 'Belum ada PO.'}</td></tr>`;
+    return;
   }
 
   tbody.innerHTML = list.map(po => {
@@ -4433,6 +4485,7 @@ function saveSO() {
       poNo: poRef ? poRef.no : null
     };
     data.sos.push(so);
+    clearColumnFilterEls(SO_FILTER_IDS); const _soSearch = document.getElementById('so-search'); if (_soSearch) _soSearch.value = '';
     logActivity(data, 'SJ', 'Tambah', `Membuat Surat Jalan ${so.no}`);
     showToast('Surat Jalan berhasil disimpan!');
   }
@@ -4447,6 +4500,220 @@ function saveSO() {
   renderSOs();
   renderPOs();
   resetSOModal();
+}
+
+// ===== DATE PICKER (KALENDER) UNTUK FILTER TANGGAL — dipakai di Surat Jalan, PO, Invoice =====
+// Cara pakai: <input class="sdp-input" readonly oninput="renderXxx()">. Tanggal terpilih
+// tampil sebagai DD/MM/YYYY, nilai ISO (YYYY-MM-DD) disimpan di input.dataset.iso.
+const SDP_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const SDP_DOW = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+const sdp = { el: null, input: null, year: 0, month: 0 };
+
+function sdpPad(n) { return String(n).padStart(2, '0'); }
+function sdpToISO(y, m, d) { return `${y}-${sdpPad(m + 1)}-${sdpPad(d)}`; }
+function sdpToDMY(iso) { const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; }
+
+function sdpEnsure() {
+  if (sdp.el) return sdp.el;
+  const el = document.createElement('div');
+  el.className = 'sdp-popup';
+  el.style.display = 'none';
+  // stopPropagation: popup di-render ulang saat navigasi, jangan dianggap "klik di luar"
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    if (act === 'pick') return sdpSet(btn.dataset.iso);
+    if (act === 'clear') return sdpSet('');
+    if (act === 'today') return sdpSet(today());
+    if (act === 'pm') sdp.month--;
+    else if (act === 'nm') sdp.month++;
+    else if (act === 'py') sdp.year--;
+    else if (act === 'ny') sdp.year++;
+    if (sdp.month < 0) { sdp.month = 11; sdp.year--; }
+    if (sdp.month > 11) { sdp.month = 0; sdp.year++; }
+    sdpRender();
+  });
+  document.body.appendChild(el);
+  sdp.el = el;
+  return el;
+}
+
+function sdpRender() {
+  const y = sdp.year, m = sdp.month;
+  const selected = sdp.input?.dataset.iso || '';
+  const todayIso = today();
+  const startOffset = (new Date(y, m, 1).getDay() + 6) % 7; // minggu dimulai Senin
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  let cells = '';
+  for (let i = 0; i < startOffset; i++) cells += '<span class="sdp-cell"></span>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = sdpToISO(y, m, d);
+    const weekend = (startOffset + d - 1) % 7 >= 5;
+    cells += `<button type="button" class="sdp-cell sdp-day${iso === selected ? ' selected' : ''}${iso === todayIso ? ' today' : ''}${weekend ? ' weekend' : ''}" data-act="pick" data-iso="${iso}">${d}</button>`;
+  }
+  sdp.el.innerHTML = `
+    <div class="sdp-head">
+      <button type="button" data-act="py" title="Tahun sebelumnya">«</button>
+      <button type="button" data-act="pm" title="Bulan sebelumnya">‹</button>
+      <div class="sdp-title">${SDP_MONTHS[m]} ${y}</div>
+      <button type="button" data-act="nm" title="Bulan berikutnya">›</button>
+      <button type="button" data-act="ny" title="Tahun berikutnya">»</button>
+    </div>
+    <div class="sdp-dow">${SDP_DOW.map(n => `<span>${n}</span>`).join('')}</div>
+    <div class="sdp-grid">${cells}</div>
+    <div class="sdp-foot">
+      <button type="button" class="sdp-today" data-act="today">Hari Ini</button>
+      <button type="button" class="sdp-clear" data-act="clear">✕ Clear Date</button>
+    </div>`;
+}
+
+function sdpPosition() {
+  if (!sdp.input || !sdp.el) return;
+  const r = sdp.input.getBoundingClientRect();
+  const w = sdp.el.offsetWidth, h = sdp.el.offsetHeight;
+  const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8));
+  let top = r.bottom + 6;
+  if (top + h > window.innerHeight - 8 && r.top - h - 6 > 8) top = r.top - h - 6; // muat ke atas kalau bawah penuh
+  sdp.el.style.left = left + 'px';
+  sdp.el.style.top = top + 'px';
+}
+
+function sdpOpen(input) {
+  const el = sdpEnsure();
+  sdp.input = input;
+  const base = input.dataset.iso ? new Date(input.dataset.iso + 'T00:00:00') : new Date();
+  sdp.year = base.getFullYear();
+  sdp.month = base.getMonth();
+  sdpRender();
+  el.style.display = 'block';
+  sdpPosition();
+}
+
+function sdpClose() {
+  if (sdp.el) sdp.el.style.display = 'none';
+  sdp.input = null;
+}
+
+function sdpSet(iso) {
+  const input = sdp.input;
+  if (!input) return;
+  if (iso) { input.dataset.iso = iso; input.value = sdpToDMY(iso); }
+  else { delete input.dataset.iso; input.value = ''; }
+  sdpClose();
+  input.dispatchEvent(new Event('input', { bubbles: true })); // memicu render ulang tabel (tanpa reload)
+}
+
+document.addEventListener('click', e => {
+  const input = e.target.closest && e.target.closest('.sdp-input');
+  if (input) {
+    if (sdp.input === input) sdpClose(); else sdpOpen(input);
+  } else {
+    sdpClose();
+  }
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { sdpClose(); return; }
+  const input = e.target.closest && e.target.closest('.sdp-input');
+  if (!input) return;
+  if (e.key === 'Delete' || e.key === 'Backspace') { sdp.input = input; sdpSet(''); e.preventDefault(); }
+  else if (e.key === 'Enter' || e.key === ' ') { sdpOpen(input); e.preventDefault(); }
+});
+window.addEventListener('resize', sdpClose);
+window.addEventListener('scroll', e => {
+  if (sdp.el && sdp.el.style.display !== 'none' && !sdp.el.contains(e.target)) sdpClose();
+}, true);
+
+// Cocokkan tanggal data (YYYY-MM-DD atau datetime) dengan tanggal terpilih (ISO)
+function sameDateISO(dateStr, iso) {
+  if (!iso) return true;
+  if (!dateStr) return false;
+  const s = String(dateStr);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s === iso;
+  const d = new Date(s);
+  if (isNaN(d)) return false;
+  return sdpToISO(d.getFullYear(), d.getMonth(), d.getDate()) === iso;
+}
+
+// Kosongkan sekumpulan elemen filter (termasuk nilai ISO milik date picker)
+function clearColumnFilterEls(ids) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = '';
+    delete el.dataset.iso;
+  });
+}
+
+// Tandai kotak filter yang sedang aktif; return true kalau ada yang aktif
+function markFilterActive(ids) {
+  let active = false;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const on = el.value.trim() !== '';
+    el.classList.toggle('filter-active', on);
+    if (on) active = true;
+  });
+  return active;
+}
+
+// Isi <select> dengan nama unik (urut A–Z) + opsi "Semua ..."; pilihan lama dipertahankan
+function populateUniqueSelect(selectId, rawNames, allLabel) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const names = [...new Set(rawNames)].sort((a, b) => a.localeCompare(b, 'id', { sensitivity: 'base' }));
+  const key = names.join('\u0001');
+  if (sel.dataset.key === key) return;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  const all = document.createElement('option');
+  all.value = '';
+  all.textContent = allLabel;
+  sel.appendChild(all);
+  names.forEach(n => {
+    const o = document.createElement('option');
+    o.value = n;
+    o.textContent = n;
+    sel.appendChild(o);
+  });
+  sel.dataset.key = key;
+  sel.value = names.includes(prev) ? prev : '';
+}
+
+// ===== FILTER PER KOLOM — PO =====
+const PO_FILTER_IDS = ['po-f-no', 'po-f-supplier', 'po-f-date', 'po-f-status'];
+
+function getPOSupplierName(data, po) {
+  return (data.customers.find(c => c.id == po.supplier)?.name || 'Unknown').trim();
+}
+
+function getPOColumnFilters() {
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  return {
+    no: v('po-f-no').toLowerCase(),
+    supplier: v('po-f-supplier'),
+    date: document.getElementById('po-f-date')?.dataset.iso || '',
+    status: v('po-f-status').toLowerCase()
+  };
+}
+
+function updatePOFilterUI(shown, total) {
+  let active = markFilterActive(PO_FILTER_IDS);
+  const search = document.getElementById('po-search');
+  if (search && search.value.trim()) active = true;
+  const info = document.getElementById('po-filter-info');
+  if (info) info.textContent = active ? `Menampilkan ${shown} dari ${total}` : `${total} PO`;
+  const btn = document.getElementById('po-reset-filter');
+  if (btn) btn.style.opacity = active ? '1' : '0.55';
+}
+
+function resetPOFilters() {
+  clearColumnFilterEls(PO_FILTER_IDS);
+  const search = document.getElementById('po-search');
+  if (search) search.value = '';
+  renderPOs();
 }
 
 // ===== FILTER PER KOLOM — SURAT JALAN =====
@@ -4486,22 +4753,10 @@ function getSOColumnFilters() {
     no: v('so-f-no').toLowerCase(),
     customer: v('so-f-customer'),
     po: v('so-f-po').toLowerCase(),
-    date: v('so-f-date').toLowerCase(),
+    date: document.getElementById('so-f-date')?.dataset.iso || '',
     items: v('so-f-items'),
     status: v('so-f-status').toLowerCase()
   };
-}
-
-// Tanggal: cocok dengan format ISO (2026-11-03), 3/11/2026, 03/11/2026, 03-11-2026, atau "3 November 2026"
-function matchSODate(dateStr, q) {
-  if (!dateStr) return false;
-  const cands = [String(dateStr)];
-  try {
-    const d = parseLocalDate(dateStr);
-    const dd = String(d.getDate()).padStart(2, '0'), mm = String(d.getMonth() + 1).padStart(2, '0'), yy = d.getFullYear();
-    cands.push(fmtDate(dateStr), `${dd}/${mm}/${yy}`, `${dd}-${mm}-${yy}`, fmtDateIndo(dateStr));
-  } catch (e) { /* abaikan, pakai kandidat yang ada */ }
-  return cands.some(c => String(c).toLowerCase().includes(q));
 }
 
 // Total Item: angka pas (3), operator (>5, >=2, <4, <=3), atau rentang (2-4)
@@ -4546,7 +4801,7 @@ function updateSOFilterUI(shown, total) {
 }
 
 function resetSOFilters() {
-  SO_FILTER_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  clearColumnFilterEls(SO_FILTER_IDS);
   const search = document.getElementById('so-search');
   if (search) search.value = '';
   renderSOs();
@@ -4575,7 +4830,7 @@ function renderSOs() {
     if (f.no && !(so.no || '').toLowerCase().includes(f.no)) return false;
     if (f.customer && getSOCustomerName(data, so) !== f.customer) return false;
     if (f.po && !(so.poNo || '').toLowerCase().includes(f.po)) return false;
-    if (f.date && !matchSODate(so.date, f.date)) return false;
+    if (f.date && !sameDateISO(so.date, f.date)) return false;
     if (f.items && !matchSOItemCount((so.items || []).length, f.items)) return false;
     if (f.status && !(so.status || '').toLowerCase().includes(f.status)) return false;
     return true;
@@ -5043,6 +5298,7 @@ function saveInv() {
     };
     syncInvPaidFieldsWithStatus(inv);
     data.invs.push(inv);
+    clearColumnFilterEls(['inv-f-no', 'inv-f-ref', 'inv-f-date', 'inv-filter-customer', 'inv-filter-status', 'inv-filter-terkirim', 'inv-filter-date-from', 'inv-filter-date-to']); const _invSearch = document.getElementById('inv-search'); if (_invSearch) _invSearch.value = '';
     logActivity(data, 'Invoice', 'Tambah', `Membuat Invoice ${inv.no}`);
     showToast('Invoice berhasil disimpan!');
   }
@@ -5103,6 +5359,15 @@ function renderInvs() {
   if (dateTo) list = list.filter(inv => inv.date && inv.date <= dateTo);
   if (filterCustomer) list = list.filter(inv => inv.customer == filterCustomer);
 
+  // Filter per kolom: No Invoice, Ref SJ, Tanggal (kalender)
+  const fNo = (document.getElementById('inv-f-no')?.value || '').trim().toLowerCase();
+  const fRef = (document.getElementById('inv-f-ref')?.value || '').trim().toLowerCase();
+  const fDate = document.getElementById('inv-f-date')?.dataset.iso || '';
+  if (fNo) list = list.filter(inv => (inv.no || '').toLowerCase().includes(fNo));
+  if (fRef) list = list.filter(inv => getInvSoNos(data, inv).join(', ').toLowerCase().includes(fRef));
+  if (fDate) list = list.filter(inv => sameDateISO(inv.date, fDate));
+  markFilterActive(['inv-f-no', 'inv-filter-customer', 'inv-f-ref', 'inv-f-date', 'inv-filter-status']);
+
   if (filterStatus) {
     if (filterStatus === 'Jatuh Tempo') {
       list = list.filter(inv => inv.status !== 'Lunas' && inv.status !== 'Lunas Sebagian' && inv.due && inv.due < todayStr);
@@ -5136,6 +5401,11 @@ function renderInvs() {
       <div style="font-size:13px;color:var(--text-muted);">Total Nominal: <strong style="color:var(--text);font-size:14px;">${rupiah(sumTotal)}</strong></div>
       <div style="font-size:13px;color:var(--text-muted);">Sisa Belum Lunas: <strong style="color:#d44;font-size:14px;">${rupiah(sumOutstanding)}</strong></div>
     `;
+  }
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr class="so-empty-row"><td colspan="10">${data.invs.length ? 'Tidak ada Invoice yang cocok dengan filter.' : 'Belum ada Invoice.'}</td></tr>`;
+    return;
   }
 
   tbody.innerHTML = list.map(inv => {
@@ -5218,6 +5488,7 @@ function resetInvFilters() {
   document.getElementById('inv-filter-customer').value = '';
   document.getElementById('inv-filter-status').value = '';
   document.getElementById('inv-filter-terkirim').value = '';
+  clearColumnFilterEls(['inv-f-no', 'inv-f-ref', 'inv-f-date']);
   const searchEl = document.getElementById('inv-search');
   if (searchEl) searchEl.value = '';
   renderInvs();
