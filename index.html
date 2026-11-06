@@ -177,7 +177,9 @@
   .col-filter-row input.filter-active, .col-filter-row select.filter-active { border-color: var(--primary, #6C5CE7); background: rgba(108,92,231,0.06); }
   .so-filter-info { font-size: 12px; color: var(--text-muted); align-self: center; white-space: nowrap; }
   .so-empty-row td { text-align: center; color: var(--text-muted); padding: 28px 16px; }
-  @media (max-width: 768px) { #so .table-scroll table { min-width: 900px; } #po .table-scroll table { min-width: 760px; } #inv .table-scroll table { min-width: 1180px; } }
+  @media (max-width: 768px) { #so .table-scroll table { min-width: 1120px; } #po .table-scroll table { min-width: 760px; } #inv .table-scroll table { min-width: 1180px; } }
+  .so-toggle { cursor: pointer; border: none; font-family: inherit; transition: transform 0.1s, filter 0.15s; }
+  .so-toggle:hover { filter: brightness(0.94); transform: translateY(-1px); }
   /* ===== Laporan Pengiriman Mingguan ===== */
   .wk-toolbar { padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .wk-range { text-align: center; flex: 1; min-width: 230px; }
@@ -764,6 +766,8 @@
               <th>Tanggal</th>
               <th>Total Item</th>
               <th>Status</th>
+              <th>Pengantaran</th>
+              <th>Pembayaran</th>
               <th>Aksi</th>
             </tr>
             <tr class="col-filter-row">
@@ -773,6 +777,8 @@
               <th><input type="text" class="sdp-input" id="so-f-date" readonly placeholder="📅 DD/MM/YYYY" autocomplete="off" oninput="renderSOs()" title="Klik untuk memilih tanggal"></th>
               <th><input type="text" id="so-f-items" placeholder="mis. 3, &gt;5, 2-4" autocomplete="off" oninput="renderSOs()" title="Angka pas (3), operator (&gt;5, &lt;=2), atau rentang (2-4)"></th>
               <th><input type="text" id="so-f-status" list="so-f-status-list" placeholder="Dikirim / Selesai" autocomplete="off" oninput="renderSOs()"><datalist id="so-f-status-list"><option value="Dikirim"><option value="Selesai"></datalist></th>
+              <th><select id="so-f-deliv" onchange="renderSOs()"><option value="">Semua</option><option value="Sedang Diantar">Sedang Diantar</option><option value="Sudah Diantar">Sudah Diantar</option></select></th>
+              <th><select id="so-f-pay" onchange="renderSOs()"><option value="">Semua</option><option value="Belum Dibayar">Belum Dibayar</option><option value="Sudah Dibayar">Sudah Dibayar</option></select></th>
               <th></th>
             </tr>
           </thead>
@@ -1463,6 +1469,20 @@
       <div class="form-group">
         <label>Kategori Barang (Opsional)</label>
         <input type="text" id="so-category" placeholder="cth: FOOD">
+      </div>
+      <div class="form-group">
+        <label>Status Pengantaran</label>
+        <select id="so-delivery-status">
+          <option value="Sedang Diantar">Sedang Diantar</option>
+          <option value="Sudah Diantar">Sudah Diantar</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Status Pembayaran</label>
+        <select id="so-pay-status">
+          <option value="Belum Dibayar">Belum Dibayar</option>
+          <option value="Sudah Dibayar">Sudah Dibayar</option>
+        </select>
       </div>
       <div class="form-group full">
         <label>Rekening Pembayaran <small style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:normal">(hanya tampil di SJ jika Outlet diset "Tampilkan Rekening di SJ")</small></label>
@@ -3755,7 +3775,7 @@ function exportTableToExcel(type) {
     data.sos.forEach(so => {
       const customer = data.customers.find(c => c.id == so.customer)?.name || 'Unknown';
       so.items.forEach(item => rows.push({
-        'No Surat Jalan': so.no, 'Ref PO': so.poNo || '-', 'Customer': customer, 'Tanggal': so.date, 'Status': so.status, 'Driver': so.driver || '',
+        'No Surat Jalan': so.no, 'Ref PO': so.poNo || '-', 'Customer': customer, 'Tanggal': so.date, 'Status': so.status, 'Status Pengantaran': soDeliveryStatus(so), 'Status Pembayaran': soPayStatus(so), 'Driver': so.driver || '',
         'Nama Barang': item.name, 'Qty': item.qty, 'UOM': item.uom || 'pcs', 'Harga': item.price, 'Subtotal': item.qty * item.price
       }));
     });
@@ -4480,6 +4500,8 @@ function editSO(id) {
   document.getElementById('so-date').value = so.date;
   document.getElementById('so-driver').value = so.driver || '';
   document.getElementById('so-status').value = so.status || 'Dikirim';
+  document.getElementById('so-delivery-status').value = soDeliveryStatus(so);
+  document.getElementById('so-pay-status').value = soPayStatus(so);
   document.getElementById('so-category').value = so.category || '';
   populatePaymentAccountSelect('so-payment-account', so.paymentAccountId || '');
   showSelectedAddress('so-customer', 'so-customer-address');
@@ -4526,6 +4548,8 @@ function saveSO() {
     so.items = items;
     so.driver = document.getElementById('so-driver').value;
     so.status = document.getElementById('so-status').value;
+    so.deliveryStatus = document.getElementById('so-delivery-status').value;
+    so.paymentStatus = document.getElementById('so-pay-status').value;
     so.category = document.getElementById('so-category').value || '';
     so.paymentAccountId = document.getElementById('so-payment-account').value || null;
     so.poId = poRefId;
@@ -4541,6 +4565,8 @@ function saveSO() {
       items: items,
       driver: document.getElementById('so-driver').value,
       status: document.getElementById('so-status').value || 'Dikirim',
+      deliveryStatus: document.getElementById('so-delivery-status').value || 'Sedang Diantar',
+      paymentStatus: document.getElementById('so-pay-status').value || 'Belum Dibayar',
       category: document.getElementById('so-category').value || '',
       paymentAccountId: document.getElementById('so-payment-account').value || null,
       poId: poRefId,
@@ -4904,7 +4930,44 @@ function resetPOFilters() {
 }
 
 // ===== FILTER PER KOLOM — SURAT JALAN =====
-const SO_FILTER_IDS = ['so-f-no', 'so-f-customer', 'so-f-po', 'so-f-date', 'so-f-items', 'so-f-status'];
+const SO_FILTER_IDS = ['so-f-no', 'so-f-customer', 'so-f-po', 'so-f-date', 'so-f-items', 'so-f-status', 'so-f-deliv', 'so-f-pay'];
+
+// Status pengantaran & pembayaran Surat Jalan (terpisah dari "Status" Dikirim/Selesai)
+const SO_DELIVERY_STATUSES = ['Sedang Diantar', 'Sudah Diantar'];
+const SO_PAY_STATUSES = ['Belum Dibayar', 'Sudah Dibayar'];
+function soDeliveryStatus(so) {
+  if (SO_DELIVERY_STATUSES.includes(so.deliveryStatus)) return so.deliveryStatus;
+  // SJ lama yang belum punya status ini: kalau sudah diinvoice (Selesai) berarti barangnya sudah sampai
+  return so.status === 'Selesai' ? 'Sudah Diantar' : 'Sedang Diantar';
+}
+function soPayStatus(so) {
+  return SO_PAY_STATUSES.includes(so.paymentStatus) ? so.paymentStatus : 'Belum Dibayar';
+}
+// Klik badge di tabel = ganti status (bisa di-Undo)
+function toggleSOStatus(id, kind) {
+  const data = loadData();
+  const so = data.sos.find(s => s.id === id);
+  if (!so) return;
+  const isDelivery = kind === 'delivery';
+  const field = isDelivery ? 'deliveryStatus' : 'paymentStatus';
+  const list = isDelivery ? SO_DELIVERY_STATUSES : SO_PAY_STATUSES;
+  const current = isDelivery ? soDeliveryStatus(so) : soPayStatus(so);
+  const hadField = Object.prototype.hasOwnProperty.call(so, field);
+  const prevRaw = so[field];
+  const next = list[(list.indexOf(current) + 1) % list.length];
+  so[field] = next;
+  logActivity(data, 'SJ', 'Edit', `${so.no}: ${isDelivery ? 'status pengantaran' : 'status pembayaran'} → ${next}`);
+  saveData(data);
+  renderSOs();
+  showUndoToast(`${so.no}: ${next}`, () => {
+    const d2 = loadData();
+    const s2 = d2.sos.find(x => x.id === id);
+    if (!s2) return;
+    if (hadField) s2[field] = prevRaw; else delete s2[field];
+    saveData(d2);
+    renderSOs();
+  });
+}
 
 function getSOCustomerName(data, so) {
   return (data.customers.find(c => c.id == so.customer)?.name || 'Unknown').trim();
@@ -4942,7 +5005,9 @@ function getSOColumnFilters() {
     po: v('so-f-po').toLowerCase(),
     date: document.getElementById('so-f-date')?.dataset.iso || '',
     items: v('so-f-items'),
-    status: v('so-f-status').toLowerCase()
+    status: v('so-f-status').toLowerCase(),
+    deliv: v('so-f-deliv'),
+    pay: v('so-f-pay')
   };
 }
 
@@ -5009,7 +5074,8 @@ function renderSOs() {
     list = list.filter(so => {
       const customer = (data.customers.find(c => c.id == so.customer)?.name || '').toLowerCase();
       return (so.no || '').toLowerCase().includes(q) || customer.includes(q) ||
-        (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q);
+        (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q) ||
+        soDeliveryStatus(so).toLowerCase().includes(q) || soPayStatus(so).toLowerCase().includes(q);
     });
   }
   // Filter per kolom (semua aktif bersamaan = AND)
@@ -5020,12 +5086,14 @@ function renderSOs() {
     if (f.date && !sameDateISO(so.date, f.date)) return false;
     if (f.items && !matchSOItemCount((so.items || []).length, f.items)) return false;
     if (f.status && !(so.status || '').toLowerCase().includes(f.status)) return false;
+    if (f.deliv && soDeliveryStatus(so) !== f.deliv) return false;
+    if (f.pay && soPayStatus(so) !== f.pay) return false;
     return true;
   });
   updateSOFilterUI(list.length, data.sos.length);
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr class="so-empty-row"><td colspan="7">${data.sos.length ? 'Tidak ada Surat Jalan yang cocok dengan filter.' : 'Belum ada Surat Jalan.'}</td></tr>`;
+    tbody.innerHTML = `<tr class="so-empty-row"><td colspan="9">${data.sos.length ? 'Tidak ada Surat Jalan yang cocok dengan filter.' : 'Belum ada Surat Jalan.'}</td></tr>`;
     return;
   }
 
@@ -5047,6 +5115,8 @@ function renderSOs() {
       <td>${fmtDate(so.date)}</td>
       <td>${so.items.length}</td>
       <td><span class="badge ${badgeClass}">${so.status}</span><br>${photoBadge}</td>
+      <td><button type="button" class="badge so-toggle ${soDeliveryStatus(so) === 'Sudah Diantar' ? 'badge-green' : 'badge-amber'}" title="Klik untuk ganti status pengantaran" onclick="toggleSOStatus(${so.id}, 'delivery')">${soDeliveryStatus(so)}</button></td>
+      <td><button type="button" class="badge so-toggle ${soPayStatus(so) === 'Sudah Dibayar' ? 'badge-green' : 'badge-coral'}" title="Klik untuk ganti status pembayaran" onclick="toggleSOStatus(${so.id}, 'pay')">${soPayStatus(so)}</button></td>
       <td class="action-btns">
         <button class="btn btn-sm btn-pdf" onclick="previewSOFromList(${so.id})">Lihat</button>
         <button class="btn btn-sm btn-outline" onclick="openSOPhotoModal(${so.id})">📷</button>
@@ -5211,6 +5281,8 @@ function resetSOModal() {
   document.getElementById('so-customer').value = '';
   document.getElementById('so-date').value = today();
   document.getElementById('so-status').value = 'Dikirim';
+  document.getElementById('so-delivery-status').value = 'Sedang Diantar';
+  document.getElementById('so-pay-status').value = 'Belum Dibayar';
   document.getElementById('so-category').value = '';
   populatePaymentAccountSelect('so-payment-account', '');
   document.getElementById('so-items').innerHTML = '';
