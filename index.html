@@ -178,6 +178,7 @@
   .so-filter-info { font-size: 12px; color: var(--text-muted); align-self: center; white-space: nowrap; }
   .so-empty-row td { text-align: center; color: var(--text-muted); padding: 28px 16px; }
   @media (max-width: 768px) { #so .table-scroll table { min-width: 1120px; } #po .table-scroll table { min-width: 760px; } #inv .table-scroll table { min-width: 1180px; } }
+  .so-inv-toggle { white-space: nowrap; }
   .so-toggle { cursor: pointer; border: none; font-family: inherit; transition: transform 0.1s, filter 0.15s; }
   .so-toggle:hover { filter: brightness(0.94); transform: translateY(-1px); }
   /* ===== Laporan Pengiriman Mingguan ===== */
@@ -203,8 +204,9 @@
   .wk-day.empty .wk-day-amount { color: var(--text-muted); font-weight: 600; }
   .wk-detail { display: none; background: var(--bg); padding: 4px 18px 14px 58px; border-top: 1px dashed var(--border); }
   .wk-day.open .wk-detail { display: block; }
-  .wk-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1.2fr); gap: 12px; align-items: center; padding: 10px 14px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; font-size: 13px; }
+  .wk-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.5fr) minmax(0, 1.3fr) 128px 118px minmax(0, 1.1fr); gap: 12px; align-items: center; padding: 10px 14px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; margin-top: 8px; font-size: 13px; }
   .wk-row-head { background: transparent; border: none; padding: 4px 14px 0; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 700; margin-top: 8px; }
+  .wk-row .badge { white-space: nowrap; }
   .wk-outlet { font-weight: 700; color: var(--text); overflow-wrap: anywhere; }
   .wk-outlet small { display: block; font-size: 11.5px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
   .wk-amt { text-align: right; font-weight: 700; white-space: nowrap; }
@@ -213,6 +215,7 @@
   .wk-total .wk-t-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; opacity: 0.85; }
   .wk-total .wk-t-value { font-size: 20px; font-weight: 800; margin-top: 4px; letter-spacing: -0.3px; }
   .wk-total .wk-t-main .wk-t-value { font-size: 24px; }
+  .wk-total .wk-t-sub { font-size: 12px; margin-top: 4px; opacity: 0.92; font-weight: 500; }
   @media (max-width: 768px) {
     .wk-toolbar .btn { flex: 1 1 auto; justify-content: center; }
     .wk-day-head { padding: 12px 12px; gap: 10px; }
@@ -220,6 +223,7 @@
     .wk-detail { padding: 2px 10px 12px 10px; }
     .wk-row-head { display: none; }
     .wk-row { grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+    .wk-row > .wk-badge-cell { align-self: start; }
     .wk-row > .wk-outlet { grid-column: 1 / -1; }
     .wk-row > [data-label]::before { content: attr(data-label); display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); font-weight: 700; margin-bottom: 1px; }
     .wk-row > .wk-amt { grid-column: 1 / -1; text-align: left; font-size: 14px; }
@@ -765,7 +769,7 @@
               <th>Ref PO</th>
               <th>Tanggal</th>
               <th>Total Item</th>
-              <th>Status</th>
+              <th>Status Invoice</th>
               <th>Pengantaran</th>
               <th>Pembayaran</th>
               <th>Aksi</th>
@@ -776,7 +780,7 @@
               <th><input type="text" id="so-f-po" placeholder="Filter Ref PO..." autocomplete="off" oninput="renderSOs()"></th>
               <th><input type="text" class="sdp-input" id="so-f-date" readonly placeholder="📅 DD/MM/YYYY" autocomplete="off" oninput="renderSOs()" title="Klik untuk memilih tanggal"></th>
               <th><input type="text" id="so-f-items" placeholder="mis. 3, &gt;5, 2-4" autocomplete="off" oninput="renderSOs()" title="Angka pas (3), operator (&gt;5, &lt;=2), atau rentang (2-4)"></th>
-              <th><input type="text" id="so-f-status" list="so-f-status-list" placeholder="Dikirim / Selesai" autocomplete="off" oninput="renderSOs()"><datalist id="so-f-status-list"><option value="Dikirim"><option value="Selesai"></datalist></th>
+              <th><select id="so-f-status" onchange="renderSOs()"><option value="">Semua</option><option value="Dikirim">Belum Dibuat Inv</option><option value="Selesai">Sudah Dibuat Inv</option></select></th>
               <th><select id="so-f-deliv" onchange="renderSOs()"><option value="">Semua</option><option value="Sedang Diantar">Sedang Diantar</option><option value="Sudah Diantar">Sudah Diantar</option></select></th>
               <th><select id="so-f-pay" onchange="renderSOs()"><option value="">Semua</option><option value="Belum Dibayar">Belum Dibayar</option><option value="Sudah Dibayar">Sudah Dibayar</option></select></th>
               <th></th>
@@ -1460,10 +1464,10 @@
       </div>
       <div class="form-group full" id="so-customer-address" style="display:none; background: var(--bg); padding: 10px 12px; border-radius: 8px; font-size: 12px; margin-top: -6px;"></div>
       <div class="form-group">
-        <label>Status</label>
+        <label>Status Invoice</label>
         <select id="so-status">
-          <option value="Dikirim">Dikirim</option>
-          <option value="Selesai">Selesai</option>
+          <option value="Dikirim">Belum Dibuat Invoice</option>
+          <option value="Selesai">Sudah Dibuat Invoice</option>
         </select>
       </div>
       <div class="form-group">
@@ -2007,21 +2011,31 @@ const ARRAY_MERGE_KEYS = ['products', 'customers', 'pos', 'sos', 'invs', 'masuks
 
 function mergeArrayByBase(base, mine, theirs) {
   base = base || []; mine = mine || []; theirs = theirs || [];
-  const baseIds = new Set(base.map(x => x.id));
+  const baseMap = new Map(base.map(x => [x.id, x]));
   const mineMap = new Map(mine.map(x => [x.id, x]));
   const theirsMap = new Map(theirs.map(x => [x.id, x]));
   const orderIds = []; // urutan: ikutin urutan `theirs` dulu, baru tambahan baru dari `mine`
-  theirs.forEach(x => orderIds.push(x.id));
-  mine.forEach(x => { if (!orderIds.includes(x.id)) orderIds.push(x.id); });
+  const seenIds = new Set();
+  theirs.forEach(x => { if (!seenIds.has(x.id)) { seenIds.add(x.id); orderIds.push(x.id); } });
+  mine.forEach(x => { if (!seenIds.has(x.id)) { seenIds.add(x.id); orderIds.push(x.id); } });
 
   const result = [];
   for (const id of orderIds) {
-    const inBase = baseIds.has(id);
+    const inBase = baseMap.has(id);
     const inMine = mineMap.has(id);
     const inTheirs = theirsMap.has(id);
     if (inBase && !inMine) continue; // kita hapus lokal -> jangan dibalikin
     if (inBase && !inTheirs) continue; // dihapus orang lain di server -> hormati, jangan dimunculin lagi
-    if (inMine) { result.push(mineMap.get(id)); continue; } // ada perubahan/tambahan dari kita -> menang
+    if (inMine) {
+      // Item yang TIDAK kita ubah (sama persis dengan base) tapi sudah diubah orang lain di server
+      // -> pakai versi server, jangan ditimpa salinan lama kita.
+      if (inBase && inTheirs && JSON.stringify(mineMap.get(id)) === JSON.stringify(baseMap.get(id))) {
+        result.push(theirsMap.get(id));
+      } else {
+        result.push(mineMap.get(id)); // ada perubahan/tambahan dari kita -> menang
+      }
+      continue;
+    }
     if (inTheirs) { result.push(theirsMap.get(id)); continue; } // ditambah/diubah orang lain, kita gak sentuh -> pakai punya server
   }
   return result;
@@ -2045,6 +2059,87 @@ function mergeAllData(base, mine, theirs) {
 let appDataCache = emptyData();
 let cloudReady = false;
 let cloudSaveTimer = null;
+
+// ===== PENGAMAN SINKRONISASI (anti data hilang) =====
+let cloudSaveInFlight = false;   // ada transaksi simpan-ke-cloud yang lagi berjalan
+let localEditSeq = 0;            // naik tiap ada perubahan lokal (deteksi edit yang terjadi SAAT save berjalan)
+let cloudRetryCount = 0;
+let cloudRetryTimer = null;
+const PENDING_SYNC_KEY = 'pendingCloudSync'; // penanda di localStorage: ada perubahan lokal yang belum terkonfirmasi masuk cloud
+
+function cloneJSON(x) { try { return JSON.parse(JSON.stringify(x)); } catch (e) { return null; } }
+// Ganti isi appDataCache TANPA mengganti objeknya (kode lain yang masih pegang `data` lama tetap menunjuk data yang sama)
+function applyDataInPlace(src) { Object.keys(src).forEach(k => { appDataCache[k] = src[k]; }); }
+function dataArraysDiffer(a, b) {
+  return ARRAY_MERGE_KEYS.some(k => JSON.stringify((a && a[k]) || []) !== JSON.stringify((b && b[k]) || []));
+}
+function setSyncedKey(key, val) {
+  if (!lastSyncedSnapshot) lastSyncedSnapshot = emptyData();
+  const c = cloneJSON(val);
+  lastSyncedSnapshot[key] = c === null ? val : c;
+}
+function hasLocalUnsyncedChanges() { return !!(pendingCloudData || cloudSaveTimer || cloudSaveInFlight); }
+function clearUndoHistory() {
+  undoHistory = [];
+  redoHistory = [];
+  updateUndoRedoButtons();
+}
+// Perubahan dari orang/device lain = ada item baru/berubah/hilang dibanding kondisi server terakhir yang kita tahu
+function isForeignChange(key, serverVal) {
+  const baseVal = lastSyncedSnapshot ? lastSyncedSnapshot[key] : undefined;
+  if (!ARRAY_MERGE_KEYS.includes(key)) return JSON.stringify(serverVal) !== JSON.stringify(baseVal);
+  const base = Array.isArray(baseVal) ? baseVal : [];
+  const server = Array.isArray(serverVal) ? serverVal : [];
+  const baseMap = new Map(base.map(x => [x.id, JSON.stringify(x)]));
+  const serverIds = new Set(server.map(x => x.id));
+  return server.some(x => baseMap.get(x.id) !== JSON.stringify(x)) || base.some(x => !serverIds.has(x.id));
+}
+// Terapkan data dari server (onSnapshot) TANPA menimpa perubahan lokal yang belum sempat terkirim.
+// Return true kalau tampilan perlu di-refresh.
+function applyRemoteField(key, serverVal) {
+  const local = appDataCache[key];
+  if (JSON.stringify(local) === JSON.stringify(serverVal)) { setSyncedKey(key, serverVal); return false; } // gema dari save kita sendiri
+  const foreign = isForeignChange(key, serverVal);
+  if (!hasLocalUnsyncedChanges()) {
+    appDataCache[key] = serverVal;
+  } else if (ARRAY_MERGE_KEYS.includes(key)) {
+    // Ada perubahan lokal yang belum terkirim: GABUNGKAN (3 arah), jangan ditimpa
+    const base = (lastSyncedSnapshot && lastSyncedSnapshot[key]) || [];
+    appDataCache[key] = mergeArrayByBase(base, local, serverVal);
+  } else {
+    const baseVal = lastSyncedSnapshot ? lastSyncedSnapshot[key] : undefined;
+    if (JSON.stringify(local) === JSON.stringify(baseVal)) appDataCache[key] = serverVal; // field ini tidak kita ubah
+  }
+  setSyncedKey(key, serverVal);
+  if (foreign) clearUndoHistory(); // snapshot undo lama bisa menghapus data orang lain kalau dipulihkan
+  return true;
+}
+
+// ===== PANTAU UKURAN DOKUMEN CLOUD (batas Firestore 1 MB per dokumen) =====
+const CLOUD_DOC_LIMIT = 1048576;
+const CLOUD_SIZE_LABELS = { sos: 'Data Surat Jalan', pos: 'Data PO', invs: 'Data Invoice', masuks: 'Data Barang Masuk', sttps: 'Data STTP', payments: 'Data Pembayaran', activityLog: 'Log Aktivitas', main: 'Data utama (produk/customer/dll)' };
+let lastSizeCheck = 0;
+const sizeWarned = {};
+function cloudDocSizes(data) {
+  const sizes = {};
+  HEAVY_KEYS.forEach(k => { try { sizes[k] = JSON.stringify(data[k] || []).length; } catch (e) { sizes[k] = 0; } });
+  try { const main = Object.assign({}, data); HEAVY_KEYS.forEach(k => delete main[k]); sizes.main = JSON.stringify(main).length; } catch (e) { sizes.main = 0; }
+  return sizes;
+}
+function checkCloudSizes(data, force) {
+  const now = Date.now();
+  if (!force && now - lastSizeCheck < 20000) return;
+  lastSizeCheck = now;
+  const sizes = cloudDocSizes(data);
+  Object.keys(sizes).forEach(k => {
+    const pct = sizes[k] / CLOUD_DOC_LIMIT;
+    const level = pct >= 0.95 ? 2 : pct >= 0.8 ? 1 : 0;
+    if (level > (sizeWarned[k] || 0)) {
+      sizeWarned[k] = level;
+      showToast(`⚠️ ${CLOUD_SIZE_LABELS[k] || k} sudah ${Math.round(sizes[k] / 1024)} KB dari batas 1.024 KB per dokumen cloud. ${level === 2 ? 'Hampir penuh — data baru bisa GAGAL tersimpan ke cloud! ' : ''}Segera hubungi developer untuk arsip/pecah data.`);
+    }
+  });
+}
 
 function loadAllFromLocalStorage() {
   return {
@@ -2074,6 +2169,27 @@ async function writeAllDocs(d) {
   batch.set(cloudDocRef, mainData);
   HEAVY_KEYS.forEach(k => batch.set(heavyDocRefs[k], { [k]: d[k] || [] }));
   await batch.commit();
+}
+
+// Kalau sebelumnya ada perubahan lokal yang belum sempat masuk cloud (tab ketutup, offline, gagal simpan),
+// data baru (yang belum ada di cloud) dipulihkan dari cadangan lokal lalu dikirim ulang — bukan dibuang.
+function reconcilePendingLocalChanges() {
+  let flagged = false;
+  try { flagged = localStorage.getItem(PENDING_SYNC_KEY) === '1'; } catch (e) {}
+  if (!flagged) return;
+  const local = loadAllFromLocalStorage();
+  const cloudCopy = cloneJSON(appDataCache);
+  let restored = 0;
+  ARRAY_MERGE_KEYS.forEach(k => {
+    const cloudArr = appDataCache[k] || [];
+    const ids = new Set(cloudArr.map(x => x.id));
+    const extra = (local[k] || []).filter(x => x && !ids.has(x.id));
+    if (extra.length) { appDataCache[k] = cloudArr.concat(extra); restored += extra.length; }
+  });
+  if (restored === 0) { try { localStorage.removeItem(PENDING_SYNC_KEY); } catch (e) {} return; }
+  if (cloudCopy) markSynced(cloudCopy);
+  persistData(appDataCache); // kirim ulang gabungan ke cloud
+  setTimeout(() => { try { showToast(`♻️ ${restored} data yang belum sempat tersimpan ke cloud berhasil dipulihkan.`); } catch (e) {} }, 1500);
 }
 
 // Ambil data dari Firestore sekali di awal, sebelum app ditampilkan
@@ -2123,11 +2239,13 @@ async function fetchCloudData() {
           needMigrateHeavy = true;
         }
       }
+      reconcilePendingLocalChanges();
       if (needMigrateHeavy) {
         await writeAllDocs(appDataCache).catch(err => console.error('Gagal migrasi dokumen terpisah:', err));
       }
     }
     cloudReady = true;
+    setTimeout(() => checkCloudSizes(appDataCache, true), 2500);
   } catch (err) {
     console.error('Gagal mengambil data dari cloud, pakai data lokal sebagai cadangan:', err);
     appDataCache = loadAllFromLocalStorage();
@@ -2290,28 +2408,37 @@ function saveData(data) {
 // Nulis data ke localStorage + cloud TANPA nyatet undo history — dipakai
 // oleh saveData() (kasus normal) dan undoAction()/redoAction() (biar aksi
 // undo/redo itu sendiri gak nambah entri undo history baru)
+// Cadangan lokal (biar tetap ada walau internet putus). Tiap key dicoba sendiri-sendiri supaya
+// satu key yang kebesaran tidak menggagalkan penyimpanan key lain.
+function writeLocalBackup(data) {
+  const set = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* quota */ } };
+  set('products', data.products);
+  set('customers', data.customers);
+  set('pos', data.pos);
+  set('sos', data.sos);
+  set('invs', data.invs);
+  set('masuks', data.masuks);
+  set('sttps', data.sttps || []);
+  set('payments', data.payments || []);
+  set('activityLog', data.activityLog || []);
+  set('profile', data.profile);
+  set('company', data.company);
+  set('payment', data.payment || {});
+  set('paymentAccounts', data.paymentAccounts || []);
+  try { if (data.logo) localStorage.setItem('logo', data.logo); } catch (e) { /* quota */ }
+}
+
 function persistData(data) {
   appDataCache = data;
-  // Cadangan lokal (biar tetap ada walau internet putus)
-  try {
-    localStorage.setItem('products', JSON.stringify(data.products));
-    localStorage.setItem('customers', JSON.stringify(data.customers));
-    localStorage.setItem('pos', JSON.stringify(data.pos));
-    localStorage.setItem('sos', JSON.stringify(data.sos));
-    localStorage.setItem('invs', JSON.stringify(data.invs));
-    localStorage.setItem('masuks', JSON.stringify(data.masuks));
-    localStorage.setItem('sttps', JSON.stringify(data.sttps || []));
-    localStorage.setItem('payments', JSON.stringify(data.payments || []));
-    localStorage.setItem('activityLog', JSON.stringify(data.activityLog || []));
-    localStorage.setItem('profile', JSON.stringify(data.profile));
-    localStorage.setItem('company', JSON.stringify(data.company));
-    localStorage.setItem('payment', JSON.stringify(data.payment || {}));
-    localStorage.setItem('paymentAccounts', JSON.stringify(data.paymentAccounts || []));
-    if (data.logo) localStorage.setItem('logo', data.logo);
-  } catch (e) { /* ignore quota errors */ }
+  localEditSeq++;
+  writeLocalBackup(data);
 
   // Simpan ke cloud (debounce sedikit biar gak spam write kalau ada banyak perubahan beruntun)
   if (!firestoreAvailable) return;
+  // Tandai "ada perubahan yang belum terkonfirmasi masuk cloud" — kalau tab ketutup / offline,
+  // data lokal ini dipulihkan & digabung ke cloud saat app dibuka lagi (bukan dibuang).
+  try { localStorage.setItem(PENDING_SYNC_KEY, '1'); } catch (e) {}
+  checkCloudSizes(data);
   pendingCloudData = data;
   hasUnsyncedChanges = true;
   clearTimeout(cloudSaveTimer);
@@ -2379,9 +2506,14 @@ function flushCloudSave() {
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = null;
   if (!pendingCloudData || !firestoreAvailable || !cloudDocRef) return;
+  // Satu save per waktu: kalau masih ada yang berjalan, tunggu selesai dulu (jangan tumpuk transaksi)
+  if (cloudSaveInFlight) { cloudSaveTimer = setTimeout(flushCloudSave, 400); return; }
   const mine = pendingCloudData;
   const base = lastSyncedSnapshot || emptyData();
+  const seqAtStart = localEditSeq;
+  const sentClone = cloneJSON(mine); // apa yang kita kirim (mine bisa terus berubah selama transaksi berjalan)
   pendingCloudData = null;
+  cloudSaveInFlight = true;
 
   db.runTransaction(async (tx) => {
     const mainSnap = await tx.get(cloudDocRef);
@@ -2393,7 +2525,7 @@ function flushCloudSave() {
       theirs[k] = heavySnaps[k].exists ? ((heavySnaps[k].data() || {})[k] || []) : [];
     });
 
-    const merged = mergeAllData(base, mine, theirs);
+    const merged = mergeAllData(base, sentClone || mine, theirs);
 
     const mainData = Object.assign({}, merged);
     HEAVY_KEYS.forEach(k => delete mainData[k]);
@@ -2402,14 +2534,33 @@ function flushCloudSave() {
 
     return merged;
   }).then((merged) => {
-    hasUnsyncedChanges = false;
-    // Ambil hasil merge sebagai kondisi terbaru (kalau ada tambahan dari device lain
-    // yang barusan ke-gabung, langsung kelihatan tanpa nunggu event onSnapshot)
-    appDataCache = merged;
+    cloudSaveInFlight = false;
+    cloudRetryCount = 0;
     markSynced(merged);
-    if (!isAnyModalOpen()) renderActivePage(currentPage);
+    const foreign = sentClone ? dataArraysDiffer(merged, sentClone) : true;
+    if (localEditSeq !== seqAtStart) {
+      // Ada perubahan lokal BARU saat save berjalan -> JANGAN ditimpa hasil merge lama.
+      // Gabungkan: base = yang barusan dikirim, mine = kondisi lokal sekarang, theirs = hasil merge.
+      if (sentClone) {
+        applyDataInPlace(mergeAllData(sentClone, appDataCache, merged));
+      }
+      pendingCloudData = appDataCache;
+      if (!cloudSaveTimer) cloudSaveTimer = setTimeout(flushCloudSave, 400);
+    } else {
+      hasUnsyncedChanges = false;
+      applyDataInPlace(merged);
+      try { localStorage.removeItem(PENDING_SYNC_KEY); } catch (e) {}
+    }
+    writeLocalBackup(appDataCache);
+    if (foreign) clearUndoHistory();
+    if (!isAnyModalOpen()) renderActivePage(currentPage); else pendingRealtimeUpdate = true;
   }).catch(err => {
+    cloudSaveInFlight = false;
     console.error('Gagal menyimpan ke cloud:', err);
+    // JANGAN buang perubahan: kembalikan ke antrean dan coba lagi otomatis.
+    if (!pendingCloudData) pendingCloudData = appDataCache;
+    hasUnsyncedChanges = true;
+    cloudRetryCount++;
     // Tampilkan kode error asli (bukan cuma "cek koneksi") — supaya kelihatan
     // kalau penyebabnya BUKAN jaringan, misal permission-denied (Firestore
     // Security Rules nolak nulis) atau invalid-argument (ada data gak valid).
@@ -2420,7 +2571,16 @@ function flushCloudSave() {
     } else if (code === 'unavailable') {
       msg = 'Gagal sinkron ke cloud. Cek koneksi internet.';
     } else if (code === 'invalid-argument') {
-      msg = 'Gagal sinkron: ada data yang tidak valid (mis. nilai undefined).';
+      const sizes = cloudDocSizes(appDataCache);
+      const biggest = Object.keys(sizes).sort((a, b) => sizes[b] - sizes[a])[0];
+      msg = /size|byte|large/i.test(String(err.message || ''))
+        ? `Gagal sinkron: ${CLOUD_SIZE_LABELS[biggest] || biggest} terlalu besar (${Math.round(sizes[biggest] / 1024)} KB, batas 1.024 KB). Data aman di perangkat ini, hubungi developer.`
+        : 'Gagal sinkron: ada data yang tidak valid (mis. nilai undefined).';
+    }
+    if (code !== 'permission-denied' && cloudRetryCount <= 5) {
+      msg += ' Data aman di perangkat ini & dicoba kirim ulang otomatis.';
+      clearTimeout(cloudRetryTimer);
+      cloudRetryTimer = setTimeout(() => { cloudRetryTimer = null; flushCloudSave(); }, Math.min(30000, 2000 * Math.pow(2, cloudRetryCount - 1)));
     }
     showToast(msg);
   });
@@ -2436,6 +2596,15 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushCloudSave();
 });
 window.addEventListener('pagehide', flushCloudSave);
+// Internet balik lagi: kirim ulang perubahan yang sempat tertahan
+window.addEventListener('online', () => {
+  let flagged = false;
+  try { flagged = localStorage.getItem(PENDING_SYNC_KEY) === '1'; } catch (e) {}
+  if (!flagged && !hasUnsyncedChanges) return;
+  cloudRetryCount = 0;
+  if (!pendingCloudData) pendingCloudData = appDataCache;
+  flushCloudSave();
+});
 // Kalau user coba nutup tab/browser padahal perubahan terakhir belum kekonfirmasi
 // kekirim ke server (mis. lagi offline), kasih peringatan browser bawaan supaya
 // user tau data ini mungkin belum keliatan di device lain sampai koneksi pulih.
@@ -3775,7 +3944,7 @@ function exportTableToExcel(type) {
     data.sos.forEach(so => {
       const customer = data.customers.find(c => c.id == so.customer)?.name || 'Unknown';
       so.items.forEach(item => rows.push({
-        'No Surat Jalan': so.no, 'Ref PO': so.poNo || '-', 'Customer': customer, 'Tanggal': so.date, 'Status': so.status, 'Status Pengantaran': soDeliveryStatus(so), 'Status Pembayaran': soPayStatus(so), 'Driver': so.driver || '',
+        'No Surat Jalan': so.no, 'Ref PO': so.poNo || '-', 'Customer': customer, 'Tanggal': so.date, 'Status Invoice': soInvoiced(so) ? 'Sudah Dibuat Inv' : 'Belum Dibuat Inv', 'Status Pengantaran': soDeliveryStatus(so), 'Status Pembayaran': soPayStatus(so), 'Driver': so.driver || '',
         'Nama Barang': item.name, 'Qty': item.qty, 'UOM': item.uom || 'pcs', 'Harga': item.price, 'Subtotal': item.qty * item.price
       }));
     });
@@ -4621,6 +4790,7 @@ function buildWeeklyReport(data, startISO) {
   const days = WK_DAYS.map((name, i) => ({ name, iso: wkAddDays(startISO, i), sjs: [], total: 0, outlets: new Set() }));
   const byIso = new Map(days.map(d => [d.iso, d]));
   const seen = new Set(); // satu Surat Jalan hanya dihitung sekali
+  let paid = 0;           // nominal SJ yang sudah dibayar
   (data.sos || []).forEach(so => {
     if (!WK_COUNTED_STATUS.includes(String(so.status || '').trim().toLowerCase())) return;
     const key = so.id != null ? 'id:' + so.id : 'no:' + so.no;
@@ -4630,7 +4800,9 @@ function buildWeeklyReport(data, startISO) {
     seen.add(key);
     const total = wkSoTotal(so);
     const outlet = data.customers.find(c => c.id == so.customer)?.name || 'Unknown';
-    day.sjs.push({ no: so.no || '-', refPo: so.poNo || '', outlet, items: (so.items || []).length, total });
+    const pay = soPayStatus(so);
+    day.sjs.push({ no: so.no || '-', refPo: so.poNo || '', outlet, items: (so.items || []).length, total, deliv: soDeliveryStatus(so), pay });
+    if (pay === 'Sudah Dibayar') paid += total;
     day.total += total;
     day.outlets.add(String(so.customer));
   });
@@ -4640,6 +4812,8 @@ function buildWeeklyReport(data, startISO) {
   return {
     days,
     total: days.reduce((s, d) => s + d.total, 0),
+    paid,
+    unpaid: days.reduce((s, d) => s + d.total, 0) - paid,
     outlets: allOutlets.size, // outlet unik (outlet yang sama di beberapa hari dihitung 1)
     sjCount: days.reduce((s, d) => s + d.sjs.length, 0)
   };
@@ -4666,12 +4840,14 @@ function renderWeekly() {
     const meta = has ? `${d.outlets.size} Outlet · ${d.sjs.length} Surat Jalan` : 'Tidak ada pengiriman';
     const detail = has ? `
       <div class="wk-detail">
-        <div class="wk-row wk-row-head"><div>Outlet / Customer</div><div>No. Surat Jalan</div><div>Ref PO</div><div style="text-align:right">Nominal</div></div>
+        <div class="wk-row wk-row-head"><div>Outlet / Customer</div><div>No. Surat Jalan</div><div>Ref PO</div><div>Pengantaran</div><div>Pembayaran</div><div style="text-align:right">Nominal</div></div>
         ${d.sjs.map(r => `
         <div class="wk-row">
           <div class="wk-outlet">${esc(r.outlet)}<small>${r.items} item/barang</small></div>
           <div data-label="No. Surat Jalan">${esc(r.no)}</div>
           <div data-label="Ref PO">${r.refPo ? esc(r.refPo) : '-'}</div>
+          <div class="wk-badge-cell" data-label="Pengantaran"><span class="badge ${r.deliv === 'Sudah Diantar' ? 'badge-green' : 'badge-amber'}">${r.deliv}</span></div>
+          <div class="wk-badge-cell" data-label="Pembayaran"><span class="badge ${r.pay === 'Sudah Dibayar' ? 'badge-green' : 'badge-coral'}">${r.pay}</span></div>
           <div class="wk-amt">${rupiah(r.total)}</div>
         </div>`).join('')}
       </div>` : '';
@@ -4692,7 +4868,7 @@ function renderWeekly() {
   document.getElementById('wk-total').innerHTML = `
     <div><div class="wk-t-label">Total Outlet Penerima</div><div class="wk-t-value">${report.outlets}</div></div>
     <div><div class="wk-t-label">Total Surat Jalan</div><div class="wk-t-value">${report.sjCount}</div></div>
-    <div class="wk-t-main"><div class="wk-t-label">Total Nominal Pengiriman 1 Minggu</div><div class="wk-t-value">${rupiah(report.total)}</div></div>`;
+    <div class="wk-t-main"><div class="wk-t-label">Total Nominal Pengiriman 1 Minggu</div><div class="wk-t-value">${rupiah(report.total)}</div><div class="wk-t-sub">Sudah Dibayar ${rupiah(report.paid)} · Belum Dibayar ${rupiah(report.unpaid)}</div></div>`;
 }
 
 function weeklyToggle(iso) {
@@ -4943,6 +5119,58 @@ function soDeliveryStatus(so) {
 function soPayStatus(so) {
   return SO_PAY_STATUSES.includes(so.paymentStatus) ? so.paymentStatus : 'Belum Dibayar';
 }
+// ===== STATUS INVOICE SJ (satu tombol toggle) =====
+// "Sudah Dibuat Inv" = status Selesai (diset otomatis saat Invoice dibuat), "Belum Dibuat Inv" = Dikirim.
+function soInvoiced(so) { return so.status === 'Selesai'; }
+function soInvButtonState(on) {
+  return {
+    cls: on ? 'badge-green' : 'badge-coral',
+    ico: on ? '✅' : '📝',
+    txt: on ? 'Sudah Dibuat Inv' : 'Belum Dibuat Inv',
+    title: on ? 'Sudah dibuat Invoice — klik untuk tandai BELUM dibuat' : 'Belum dibuat Invoice — klik untuk tandai SUDAH dibuat'
+  };
+}
+function soInvToggleHTML(so) {
+  const on = soInvoiced(so);
+  const st = soInvButtonState(on);
+  return `<button type="button" class="badge so-toggle so-inv-toggle ${st.cls}" aria-pressed="${on}" title="${st.title}" onclick="toggleSOInvoice(${so.id}, this)"><span class="so-inv-ico">${st.ico}</span> <span class="so-inv-txt">${st.txt}</span></button>`;
+}
+// Ubah tampilan tombol di tempat (tanpa render ulang tabel) sesuai kondisi terbaru
+function updateSOInvoiceButton(btn, on) {
+  const st = soInvButtonState(on);
+  btn.classList.remove('badge-green', 'badge-coral');
+  btn.classList.add(st.cls);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.title = st.title;
+  const ico = btn.querySelector('.so-inv-ico'), txt = btn.querySelector('.so-inv-txt');
+  if (ico) ico.textContent = st.ico;
+  if (txt) txt.textContent = st.txt;
+}
+function toggleSOInvoice(id, btn) {
+  const data = loadData();
+  const so = data.sos.find(s => s.id === id);
+  if (!so) return;
+  const wasOn = soInvoiced(so);
+  if (wasOn) {
+    const linked = data.invs.filter(inv => getInvSoIds(inv).some(x => String(x) === String(so.id)));
+    if (linked.length && !confirm(`SJ ${so.no} tercatat di Invoice ${linked.map(i => i.no).join(', ')}.\nTetap tandai sebagai BELUM dibuat Invoice?`)) return;
+  }
+  const prevStatus = so.status;
+  so.status = wasOn ? 'Dikirim' : 'Selesai';
+  const label = wasOn ? 'Belum Dibuat Inv' : 'Sudah Dibuat Inv';
+  logActivity(data, 'SJ', 'Edit', `${so.no}: status invoice → ${label}`);
+  saveData(data);
+  if (btn && btn.isConnected) updateSOInvoiceButton(btn, !wasOn); else renderSOs();
+  showUndoToast(`${so.no}: ${label}`, () => {
+    const d2 = loadData();
+    const s2 = d2.sos.find(x => x.id === id);
+    if (!s2) return;
+    s2.status = prevStatus;
+    saveData(d2);
+    renderSOs();
+  });
+}
+
 // Klik badge di tabel = ganti status (bisa di-Undo)
 function toggleSOStatus(id, kind) {
   const data = loadData();
@@ -5074,7 +5302,7 @@ function renderSOs() {
     list = list.filter(so => {
       const customer = (data.customers.find(c => c.id == so.customer)?.name || '').toLowerCase();
       return (so.no || '').toLowerCase().includes(q) || customer.includes(q) ||
-        (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q) ||
+        (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q) || (soInvoiced(so) ? 'sudah dibuat inv' : 'belum dibuat inv').includes(q) ||
         soDeliveryStatus(so).toLowerCase().includes(q) || soPayStatus(so).toLowerCase().includes(q);
     });
   }
@@ -5114,7 +5342,7 @@ function renderSOs() {
       <td>${poNoCell}</td>
       <td>${fmtDate(so.date)}</td>
       <td>${so.items.length}</td>
-      <td><span class="badge ${badgeClass}">${so.status}</span><br>${photoBadge}</td>
+      <td>${soInvToggleHTML(so)}<br>${photoBadge}</td>
       <td><button type="button" class="badge so-toggle ${soDeliveryStatus(so) === 'Sudah Diantar' ? 'badge-green' : 'badge-amber'}" title="Klik untuk ganti status pengantaran" onclick="toggleSOStatus(${so.id}, 'delivery')">${soDeliveryStatus(so)}</button></td>
       <td><button type="button" class="badge so-toggle ${soPayStatus(so) === 'Sudah Dibayar' ? 'badge-green' : 'badge-coral'}" title="Klik untuk ganti status pembayaran" onclick="toggleSOStatus(${so.id}, 'pay')">${soPayStatus(so)}</button></td>
       <td class="action-btns">
@@ -5514,6 +5742,7 @@ function saveInv() {
   const soRefs = soRefIds.map(id => data.sos.find(s => String(s.id) === String(id))).filter(Boolean);
 
   const finalInvNo = document.getElementById('inv-no').value.trim() || generateNo('INV');
+  let prevInvSoIds = []; // SJ yang sebelumnya terpasang di invoice ini (saat edit)
   const dupInv = data.invs.find(i => i.id !== editingInvId && (i.no || '').trim().toLowerCase() === finalInvNo.toLowerCase());
   if (dupInv) {
     const dupCust = data.customers.find(c => c.id == dupInv.customer)?.name || 'customer lain';
@@ -5522,6 +5751,7 @@ function saveInv() {
   
   if (editingInvId) {
     const inv = data.invs.find(i => i.id === editingInvId);
+    prevInvSoIds = getInvSoIds(inv).map(String);
     inv.no = finalInvNo;
     inv.customer = document.getElementById('inv-customer').value;
     inv.date = document.getElementById('inv-date').value;
@@ -5562,6 +5792,12 @@ function saveInv() {
     showToast('Invoice berhasil disimpan!');
   }
 
+  // SJ yang dilepas dari invoice ini (saat edit) & tidak dipakai invoice lain -> kembali "Belum Dibuat Inv"
+  prevInvSoIds.filter(sid => !soRefIds.map(String).includes(sid)).forEach(sid => {
+    const soR = data.sos.find(s => String(s.id) === sid);
+    const usedElsewhere = data.invs.some(inv => getInvSoIds(inv).some(x => String(x) === sid));
+    if (soR && soR.status === 'Selesai' && !usedElsewhere) soR.status = 'Dikirim';
+  });
   // Tandai semua Surat Jalan (dan PO terkait) yang direferensikan sebagai Selesai
   soRefs.forEach(soRef => {
     soRef.status = 'Selesai';
@@ -6003,14 +6239,25 @@ function deleteInv(id) {
     if (idx === -1) return;
     const removed = data.invs[idx];
     data.invs = data.invs.filter(inv => inv.id !== id);
+    // SJ yang tadinya terpasang di invoice ini (dan tidak dipakai invoice lain) kembali jadi "Belum Dibuat Inv",
+    // supaya muncul lagi di daftar SJ saat bikin invoice (sebelumnya SJ-nya nyangkut sebagai "Selesai").
+    const revertedSoIds = [];
+    getInvSoIds(removed).forEach(sid => {
+      const soR = data.sos.find(s => String(s.id) === String(sid));
+      const usedElsewhere = data.invs.some(inv => getInvSoIds(inv).some(x => String(x) === String(sid)));
+      if (soR && soR.status === 'Selesai' && !usedElsewhere) { soR.status = 'Dikirim'; revertedSoIds.push(soR.id); }
+    });
     logActivity(data, 'Invoice', 'Hapus', `Menghapus Invoice ${removed.no}`);
     saveData(data);
     renderInvs();
+    renderSOs();
     showUndoToast(`Invoice "${removed.no}" dihapus.`, () => {
       const d2 = loadData();
       d2.invs.splice(idx, 0, removed);
+      revertedSoIds.forEach(sid => { const s2 = d2.sos.find(x => x.id === sid); if (s2) s2.status = 'Selesai'; });
       saveData(d2);
       renderInvs();
+      renderSOs();
       showToast('Penghapusan dibatalkan.');
     });
   }
@@ -7571,7 +7818,8 @@ function startRealtimeSync() {
   if (!firestoreAvailable || !cloudDocRef || realtimeUnsubs.length) return;
 
   const handleUpdate = () => {
-    markSynced(appDataCache);
+    // CATATAN: sengaja TIDAK memanggil markSynced(appDataCache) di sini — kalau ada data lokal yang
+    // belum terkirim, itu akan dianggap "sudah ada di server" lalu dibuang saat merge berikutnya.
     updateStoreBranding();
     if (isAnyModalOpen()) {
       // Tunda render sampai modal ditutup, biar form yang lagi diisi ga keganggu
@@ -7588,16 +7836,16 @@ function startRealtimeSync() {
     if (snap.metadata.hasPendingWrites) return;
     if (!snap.exists) return;
     const cloud = snap.data() || {};
-    Object.keys(cloud).forEach(k => { if (!HEAVY_KEYS.includes(k)) appDataCache[k] = cloud[k]; });
-    handleUpdate();
+    let changed = false;
+    Object.keys(cloud).forEach(k => { if (!HEAVY_KEYS.includes(k) && applyRemoteField(k, cloud[k])) changed = true; });
+    if (changed) handleUpdate();
   }, err => console.error('Realtime sync error (main):', err)));
 
   HEAVY_KEYS.forEach(k => {
     realtimeUnsubs.push(heavyDocRefs[k].onSnapshot(snap => {
       if (snap.metadata.hasPendingWrites) return;
       if (!snap.exists) return;
-      appDataCache[k] = (snap.data() || {})[k] || [];
-      handleUpdate();
+      if (applyRemoteField(k, (snap.data() || {})[k] || [])) handleUpdate();
     }, err => console.error(`Realtime sync error (${k}):`, err)));
   });
 }
