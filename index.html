@@ -179,6 +179,12 @@
   .so-empty-row td { text-align: center; color: var(--text-muted); padding: 28px 16px; }
   @media (max-width: 768px) { #so .table-scroll table { min-width: 1120px; } #po .table-scroll table { min-width: 760px; } #inv .table-scroll table { min-width: 1180px; } }
   .so-inv-toggle { white-space: nowrap; }
+  .badge-cancel { background: #ECECF1; color: #5B5B73; }
+  body.dark-mode .badge-cancel { background: rgba(255,255,255,0.10); color: #c7c7d6; }
+  #so-table tr.so-cancelled td { opacity: 0.6; }
+  #so-table tr.so-cancelled td.so-cancel-cell, #so-table tr.so-cancelled td.action-btns { opacity: 1; }
+  #so-table tr.so-cancelled td:first-child strong { text-decoration: line-through; }
+  .so-cancel-note { font-size: 11px; color: var(--text-muted); margin-top: 4px; max-width: 230px; white-space: normal; line-height: 1.35; }
   .so-toggle { cursor: pointer; border: none; font-family: inherit; transition: transform 0.1s, filter 0.15s; }
   .so-toggle:hover { filter: brightness(0.94); transform: translateY(-1px); }
   /* ===== Laporan Pengiriman Mingguan ===== */
@@ -780,7 +786,7 @@
               <th><input type="text" id="so-f-po" placeholder="Filter Ref PO..." autocomplete="off" oninput="renderSOs()"></th>
               <th><input type="text" class="sdp-input" id="so-f-date" readonly placeholder="📅 DD/MM/YYYY" autocomplete="off" oninput="renderSOs()" title="Klik untuk memilih tanggal"></th>
               <th><input type="text" id="so-f-items" placeholder="mis. 3, &gt;5, 2-4" autocomplete="off" oninput="renderSOs()" title="Angka pas (3), operator (&gt;5, &lt;=2), atau rentang (2-4)"></th>
-              <th><select id="so-f-status" onchange="renderSOs()"><option value="">Semua</option><option value="Dikirim">Belum Dibuat Inv</option><option value="Selesai">Sudah Dibuat Inv</option></select></th>
+              <th><select id="so-f-status" onchange="renderSOs()"><option value="">Semua</option><option value="Dikirim">Belum Dibuat Inv</option><option value="Selesai">Sudah Dibuat Inv</option><option value="Dibatalkan">Dibatalkan</option></select></th>
               <th><select id="so-f-deliv" onchange="renderSOs()"><option value="">Semua</option><option value="Sedang Diantar">Sedang Diantar</option><option value="Sudah Diantar">Sudah Diantar</option></select></th>
               <th><select id="so-f-pay" onchange="renderSOs()"><option value="">Semua</option><option value="Belum Dibayar">Belum Dibayar</option><option value="Sudah Dibayar">Sudah Dibayar</option></select></th>
               <th></th>
@@ -1820,6 +1826,33 @@
       <button class="btn btn-outline" onclick="closeModal('pdfModal')">Tutup</button>
       <button class="btn btn-success" onclick="printDocPlain('pdfContent')">🖨️ Cetak</button>
       <button class="btn btn-primary" onclick="downloadPDF()">⬇️ Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- SO CANCEL MODAL -->
+<div class="modal-overlay" id="soCancelModal">
+  <div class="modal" style="max-width: 460px;">
+    <div class="modal-header">
+      <div class="modal-title">🚫 Batalkan Surat Jalan — <span id="soCancelNo"></span></div>
+      <button class="modal-close" onclick="closeModal('soCancelModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px;line-height:1.5">SJ <strong>tidak dihapus</strong> — tetap tercatat sebagai <strong>Dibatalkan</strong> beserta alasannya. SJ yang dibatalkan tidak dihitung di Laporan Mingguan, Rekap, Dashboard, dan tidak bisa dipilih untuk Invoice. Nomornya juga tidak dipakai ulang.</div>
+      <div class="form-group full">
+        <label>Alasan Pembatalan *</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <button type="button" class="btn btn-sm btn-outline" onclick="setSOCancelReason('Customer batal order')">Customer batal order</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="setSOCancelReason('Barang tidak tersedia')">Barang tidak tersedia</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="setSOCancelReason('Salah buat / SJ dobel')">Salah buat / dobel</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick="setSOCancelReason('Pengiriman ditunda / tidak jadi kirim')">Tidak jadi kirim</button>
+        </div>
+        <textarea id="soCancelReason" rows="3" placeholder="Tulis alasan pembatalan..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('soCancelModal')">Kembali</button>
+      <button class="btn btn-danger" onclick="confirmCancelSO()">🚫 Batalkan SJ</button>
     </div>
   </div>
 </div>
@@ -3512,7 +3545,7 @@ function openOutletHistoryModal(customerId) {
 // Kumpulkan & ringkas semua produk yang pernah dikirim (via Surat Jalan) ke outlet ini
 function getOutletProductHistory(customerId) {
   const data = loadData();
-  const sos = data.sos.filter(so => String(so.customer) === String(customerId));
+  const sos = data.sos.filter(so => String(so.customer) === String(customerId) && !soIsCancelled(so));
   const map = {};
   sos.forEach(so => {
     so.items.forEach(item => {
@@ -3945,7 +3978,7 @@ function exportTableToExcel(type) {
     data.sos.forEach(so => {
       const customer = data.customers.find(c => c.id == so.customer)?.name || 'Unknown';
       so.items.forEach(item => rows.push({
-        'No Surat Jalan': so.no, 'Ref PO': so.poNo || '-', 'Customer': customer, 'Tanggal': so.date, 'Status Invoice': soInvoiced(so) ? 'Sudah Dibuat Inv' : 'Belum Dibuat Inv', 'Status Pengantaran': soDeliveryStatus(so), 'Status Pembayaran': soPayStatus(so), 'Driver': so.driver || '',
+        'No Surat Jalan': so.no, 'Ref PO': so.poNo || '-', 'Customer': customer, 'Tanggal': so.date, 'Status Invoice': soIsCancelled(so) ? 'Dibatalkan' : (soInvoiced(so) ? 'Sudah Dibuat Inv' : 'Belum Dibuat Inv'), 'Alasan Pembatalan': so.cancelReason || '', 'Status Pengantaran': soIsCancelled(so) ? '-' : soDeliveryStatus(so), 'Status Pembayaran': soIsCancelled(so) ? '-' : soPayStatus(so), 'Driver': so.driver || '',
         'Nama Barang': item.name, 'Qty': item.qty, 'UOM': item.uom || 'pcs', 'Harga': item.price, 'Subtotal': item.qty * item.price
       }));
     });
@@ -4662,6 +4695,7 @@ function editSO(id) {
   const data = loadData();
   const so = data.sos.find(s => s.id === id);
   if (!so) return;
+  if (soIsCancelled(so)) { showToast('SJ ini dibatalkan. Klik ↩️ Aktifkan dulu kalau mau diedit.'); return; }
   editingSOId = id;
   document.getElementById('soModalTitle').textContent = 'Edit / Revisi Surat Jalan';
   document.getElementById('so-no').value = so.no;
@@ -5120,6 +5154,90 @@ function soDeliveryStatus(so) {
 function soPayStatus(so) {
   return SO_PAY_STATUSES.includes(so.paymentStatus) ? so.paymentStatus : 'Belum Dibayar';
 }
+// ===== BATALKAN SURAT JALAN (tetap tercatat, tidak dihapus) =====
+// SJ yang dibatalkan: status = 'Dibatalkan' + alasan + waktu. Tidak dihitung di laporan/rekap/dashboard/invoice.
+function soIsCancelled(so) { return !!so && so.status === 'Dibatalkan'; }
+function nowLocalStamp() {
+  const d = new Date(), p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fmtCancelStamp(st) {
+  const m = String(st || '').match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}${m[4] ? ' ' + m[4] + ':' + m[5] : ''}` : '';
+}
+function soCancelCellHTML(so) {
+  const when = fmtCancelStamp(so.cancelledAt);
+  return `<span class="badge badge-cancel">🚫 Dibatalkan</span><div class="so-cancel-note" title="${escapeHtml(so.cancelReason || '')}">Alasan: ${escapeHtml(so.cancelReason || '-')}${when ? '<br>' + when : ''}</div>`;
+}
+let cancellingSOId = null;
+function openCancelSO(id) {
+  const data = loadData();
+  const so = data.sos.find(s => s.id === id);
+  if (!so || soIsCancelled(so)) return;
+  const linked = data.invs.filter(inv => getInvSoIds(inv).some(x => String(x) === String(so.id)));
+  if (linked.length) {
+    alert(`SJ ${so.no} sudah dipakai di Invoice ${linked.map(i => i.no).join(', ')}.\nLepas SJ ini dari invoice (edit invoice) atau hapus invoicenya dulu, baru SJ bisa dibatalkan.`);
+    return;
+  }
+  cancellingSOId = id;
+  document.getElementById('soCancelNo').textContent = so.no;
+  document.getElementById('soCancelReason').value = '';
+  document.getElementById('soCancelModal').classList.add('open');
+  setTimeout(() => { const el = document.getElementById('soCancelReason'); if (el) el.focus(); }, 50);
+}
+function setSOCancelReason(text) {
+  const el = document.getElementById('soCancelReason');
+  el.value = text;
+  el.focus();
+}
+function confirmCancelSO() {
+  const el = document.getElementById('soCancelReason');
+  const reason = el.value.trim();
+  if (!reason) { showToast('Isi alasan pembatalan dulu ya.'); el.focus(); return; }
+  const data = loadData();
+  const so = data.sos.find(s => s.id === cancellingSOId);
+  if (!so) { closeModal('soCancelModal'); return; }
+  const prevStatus = so.status;
+  so.statusBeforeCancel = prevStatus;
+  so.status = 'Dibatalkan';
+  so.cancelReason = reason;
+  so.cancelledAt = nowLocalStamp();
+  logActivity(data, 'SJ', 'Edit', `Membatalkan Surat Jalan ${so.no} — alasan: ${reason}`);
+  saveData(data);
+  closeModal('soCancelModal');
+  renderSOs();
+  const id = so.id;
+  showUndoToast(`${so.no} dibatalkan.`, () => {
+    const d2 = loadData();
+    const s2 = d2.sos.find(x => x.id === id);
+    if (!s2) return;
+    s2.status = prevStatus;
+    delete s2.cancelReason; delete s2.cancelledAt; delete s2.statusBeforeCancel;
+    saveData(d2);
+    renderSOs();
+  });
+}
+function restoreCancelledSO(id) {
+  const data = loadData();
+  const so = data.sos.find(s => s.id === id);
+  if (!so || !soIsCancelled(so)) return;
+  if (!confirm(`Aktifkan lagi Surat Jalan ${so.no}?`)) return;
+  const prev = { status: so.status, reason: so.cancelReason, at: so.cancelledAt, before: so.statusBeforeCancel };
+  so.status = so.statusBeforeCancel === 'Selesai' ? 'Selesai' : 'Dikirim';
+  delete so.cancelReason; delete so.cancelledAt; delete so.statusBeforeCancel;
+  logActivity(data, 'SJ', 'Edit', `Mengaktifkan kembali Surat Jalan ${so.no} (sebelumnya dibatalkan)`);
+  saveData(data);
+  renderSOs();
+  showUndoToast(`${so.no} diaktifkan kembali.`, () => {
+    const d2 = loadData();
+    const s2 = d2.sos.find(x => x.id === id);
+    if (!s2) return;
+    s2.status = prev.status; s2.cancelReason = prev.reason; s2.cancelledAt = prev.at; s2.statusBeforeCancel = prev.before;
+    saveData(d2);
+    renderSOs();
+  });
+}
+
 // ===== STATUS INVOICE SJ (satu tombol toggle) =====
 // "Sudah Dibuat Inv" = status Selesai (diset otomatis saat Invoice dibuat), "Belum Dibuat Inv" = Dikirim.
 function soInvoiced(so) { return so.status === 'Selesai'; }
@@ -5150,7 +5268,7 @@ function updateSOInvoiceButton(btn, on) {
 function toggleSOInvoice(id, btn) {
   const data = loadData();
   const so = data.sos.find(s => s.id === id);
-  if (!so) return;
+  if (!so || soIsCancelled(so)) return;
   const wasOn = soInvoiced(so);
   if (wasOn) {
     const linked = data.invs.filter(inv => getInvSoIds(inv).some(x => String(x) === String(so.id)));
@@ -5176,7 +5294,7 @@ function toggleSOInvoice(id, btn) {
 function toggleSOStatus(id, kind) {
   const data = loadData();
   const so = data.sos.find(s => s.id === id);
-  if (!so) return;
+  if (!so || soIsCancelled(so)) return;
   const isDelivery = kind === 'delivery';
   const field = isDelivery ? 'deliveryStatus' : 'paymentStatus';
   const list = isDelivery ? SO_DELIVERY_STATUSES : SO_PAY_STATUSES;
@@ -5264,7 +5382,7 @@ function matchSOItemCount(count, raw) {
   return false;
 }
 
-function updateSOFilterUI(shown, total) {
+function updateSOFilterUI(shown, total, cancelled) {
   let active = false;
   SO_FILTER_IDS.forEach(id => {
     const el = document.getElementById(id);
@@ -5276,7 +5394,7 @@ function updateSOFilterUI(shown, total) {
   const search = document.getElementById('so-search');
   if (search && search.value.trim()) active = true;
   const info = document.getElementById('so-filter-info');
-  if (info) info.textContent = active ? `Menampilkan ${shown} dari ${total}` : `${total} Surat Jalan`;
+  if (info) info.textContent = active ? `Menampilkan ${shown} dari ${total}` : `${total} Surat Jalan${cancelled ? ` · ${cancelled} dibatalkan` : ''}`;
   const btn = document.getElementById('so-reset-filter');
   if (btn) btn.style.opacity = active ? '1' : '0.55';
 }
@@ -5303,7 +5421,7 @@ function renderSOs() {
     list = list.filter(so => {
       const customer = (data.customers.find(c => c.id == so.customer)?.name || '').toLowerCase();
       return (so.no || '').toLowerCase().includes(q) || customer.includes(q) ||
-        (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q) || (soInvoiced(so) ? 'sudah dibuat inv' : 'belum dibuat inv').includes(q) ||
+        (so.poNo || '').toLowerCase().includes(q) || (so.status || '').toLowerCase().includes(q) || (so.cancelReason || '').toLowerCase().includes(q) || (soInvoiced(so) ? 'sudah dibuat inv' : 'belum dibuat inv').includes(q) ||
         soDeliveryStatus(so).toLowerCase().includes(q) || soPayStatus(so).toLowerCase().includes(q);
     });
   }
@@ -5315,11 +5433,11 @@ function renderSOs() {
     if (f.date && !sameDateISO(so.date, f.date)) return false;
     if (f.items && !matchSOItemCount((so.items || []).length, f.items)) return false;
     if (f.status && !(so.status || '').toLowerCase().includes(f.status)) return false;
-    if (f.deliv && soDeliveryStatus(so) !== f.deliv) return false;
-    if (f.pay && soPayStatus(so) !== f.pay) return false;
+    if (f.deliv && (soIsCancelled(so) || soDeliveryStatus(so) !== f.deliv)) return false;
+    if (f.pay && (soIsCancelled(so) || soPayStatus(so) !== f.pay)) return false;
     return true;
   });
-  updateSOFilterUI(list.length, data.sos.length);
+  updateSOFilterUI(list.length, data.sos.length, data.sos.filter(soIsCancelled).length);
 
   if (list.length === 0) {
     tbody.innerHTML = `<tr class="so-empty-row"><td colspan="9">${data.sos.length ? 'Tidak ada Surat Jalan yang cocok dengan filter.' : 'Belum ada Surat Jalan.'}</td></tr>`;
@@ -5334,23 +5452,33 @@ function renderSOs() {
       ? `<span class="photo-badge has-photos">📷 ${photoCount}</span>`
       : `<span class="photo-badge">📷 0</span>`;
     // Tandai kalau ada SJ lain dgn No. PO sama (misal pasangan SJ susulan), biar gampang dikenali
-    const hasPoGroup = so.poNo && data.sos.some(s => s.id !== so.id && normalizePoNo(s.poNo) === normalizePoNo(so.poNo));
+    const hasPoGroup = so.poNo && data.sos.some(s => s.id !== so.id && !soIsCancelled(s) && normalizePoNo(s.poNo) === normalizePoNo(so.poNo));
     const poNoCell = so.poNo ? `${so.poNo}${hasPoGroup ? ' <span title="Ada SJ lain dgn No. PO yang sama (kemungkinan susulan) — bisa digabung 1 Invoice" style="color:var(--purple)">🔗</span>' : ''}` : '-';
     
-    return `<tr>
+    const cancelled = soIsCancelled(so);
+    const delivCell = cancelled ? '<td>—</td>' : `<td><button type="button" class="badge so-toggle ${soDeliveryStatus(so) === 'Sudah Diantar' ? 'badge-green' : 'badge-amber'}" title="Klik untuk ganti status pengantaran" onclick="toggleSOStatus(${so.id}, 'delivery')">${soDeliveryStatus(so)}</button></td>`;
+    const payCell = cancelled ? '<td>—</td>' : `<td><button type="button" class="badge so-toggle ${soPayStatus(so) === 'Sudah Dibayar' ? 'badge-green' : 'badge-coral'}" title="Klik untuk ganti status pembayaran" onclick="toggleSOStatus(${so.id}, 'pay')">${soPayStatus(so)}</button></td>`;
+    const actionsHTML = cancelled ? `
+        <button class="btn btn-sm btn-pdf" onclick="previewSOFromList(${so.id})">Lihat</button>
+        <button class="btn btn-sm btn-outline" onclick="openSOPhotoModal(${so.id})">📷</button>
+        <button class="btn btn-sm btn-outline" onclick="restoreCancelledSO(${so.id})">↩️ Aktifkan</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteSO(${so.id})">Hapus</button>` : `
+        <button class="btn btn-sm btn-pdf" onclick="previewSOFromList(${so.id})">Lihat</button>
+        <button class="btn btn-sm btn-outline" onclick="openSOPhotoModal(${so.id})">📷</button>
+        <button class="btn btn-sm btn-outline" onclick="editSO(${so.id})">✏️ Edit</button>
+        <button class="btn btn-sm btn-outline" title="Batalkan SJ (tetap tercatat, tidak dihapus)" onclick="openCancelSO(${so.id})">🚫 Batalkan</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteSO(${so.id})">Hapus</button>`;
+
+    return `<tr class="${cancelled ? 'so-cancelled' : ''}">
       <td><strong>${so.no}</strong></td>
       <td>${customer}</td>
       <td>${poNoCell}</td>
       <td>${fmtDate(so.date)}</td>
       <td>${so.items.length}</td>
-      <td>${soInvToggleHTML(so)}<br>${photoBadge}</td>
-      <td><button type="button" class="badge so-toggle ${soDeliveryStatus(so) === 'Sudah Diantar' ? 'badge-green' : 'badge-amber'}" title="Klik untuk ganti status pengantaran" onclick="toggleSOStatus(${so.id}, 'delivery')">${soDeliveryStatus(so)}</button></td>
-      <td><button type="button" class="badge so-toggle ${soPayStatus(so) === 'Sudah Dibayar' ? 'badge-green' : 'badge-coral'}" title="Klik untuk ganti status pembayaran" onclick="toggleSOStatus(${so.id}, 'pay')">${soPayStatus(so)}</button></td>
-      <td class="action-btns">
-        <button class="btn btn-sm btn-pdf" onclick="previewSOFromList(${so.id})">Lihat</button>
-        <button class="btn btn-sm btn-outline" onclick="openSOPhotoModal(${so.id})">📷</button>
-        <button class="btn btn-sm btn-outline" onclick="editSO(${so.id})">✏️ Edit</button>
-        <button class="btn btn-sm btn-danger" onclick="deleteSO(${so.id})">Hapus</button>
+      <td class="${cancelled ? 'so-cancel-cell' : ''}">${cancelled ? soCancelCellHTML(so) : soInvToggleHTML(so)}<br>${photoBadge}</td>
+      ${delivCell}
+      ${payCell}
+      <td class="action-btns">${actionsHTML}
       </td>
     </tr>`;
   }).join('');
@@ -5559,7 +5687,7 @@ function renderInvSOCheckboxesForCustomer(preselectedIds) {
   }
   const pre = (preselectedIds || []).map(String);
   // SJ yang belum "Selesai" (belum diinvoice) ATAU SJ yang memang sudah terpasang di invoice ini (saat edit)
-  const custSOs = data.sos.filter(so => String(so.customer) === String(custId) && (so.status !== 'Selesai' || pre.includes(String(so.id))));
+  const custSOs = data.sos.filter(so => String(so.customer) === String(custId) && so.status !== 'Dibatalkan' && (so.status !== 'Selesai' || pre.includes(String(so.id))));
   renderInvSOCheckboxList(custSOs, pre);
 }
 
@@ -7106,6 +7234,7 @@ function renderDashboardChart() {
   if (dashboardChartMode === 'omset') {
     // Omset dari SJ (surat jalan)
     data.sos.forEach(so => {
+      if (soIsCancelled(so)) return;
       const key = so.date ? so.date.substring(0, 7) : '';
       const m = months.find(m => m.key === key);
       if (m) m.value += so.items.reduce((s, i) => s + (i.qty || 0) * (i.price || 0), 0);
@@ -7113,6 +7242,7 @@ function renderDashboardChart() {
   } else {
     // Total qty item dikirim dari SJ
     data.sos.forEach(so => {
+      if (soIsCancelled(so)) return;
       const key = so.date ? so.date.substring(0, 7) : '';
       const m = months.find(m => m.key === key);
       if (m) m.value += so.items.reduce((s, i) => s + (i.qty || 0), 0);
@@ -8041,7 +8171,7 @@ function renderRekap() {
     const soDate = so.date;
     const matchDate = (!dateFrom || soDate >= dateFrom) && (!dateTo || soDate <= dateTo);
     const matchOutlet = !outletId || String(so.customer) === String(outletId);
-    return matchDate && matchOutlet;
+    return matchDate && matchOutlet && !soIsCancelled(so);
   });
 
   // Flatten ke baris per item
@@ -8227,7 +8357,7 @@ function exportRekapExcel() {
   const filtered = data.sos.filter(so => {
     const matchDate = (!dateFrom || so.date >= dateFrom) && (!dateTo || so.date <= dateTo);
     const matchOutlet = !outletId || String(so.customer) === String(outletId);
-    return matchDate && matchOutlet;
+    return matchDate && matchOutlet && !soIsCancelled(so);
   });
 
   const rows = [];
