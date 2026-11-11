@@ -1541,7 +1541,8 @@
     <div class="modal-body">
       <div class="form-group full">
         <label>No Invoice</label>
-        <input type="text" id="inv-no" placeholder="Auto generate" readonly>
+        <input type="text" id="inv-no" placeholder="Nomor Invoice (otomatis, bisa diedit)" autocomplete="off">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Bisa diubah manual. Kalau nomor diganti saat revisi, Tanda Terima (STTP) &amp; riwayat Pembayaran yang terkait ikut diperbarui otomatis.</div>
       </div>
       <div class="form-group">
         <label>Customer</label>
@@ -5719,6 +5720,21 @@ function editInv(id) {
   document.getElementById('invModal').classList.add('open');
 }
 
+// Tanda Terima (STTP) & Pembayaran menyimpan nomor invoice (bukan id). Kalau nomor invoice diganti,
+// semua rujukan ke nomor lama ikut diganti supaya tautannya tidak putus.
+function renameInvoiceNoReferences(data, oldNo, newNo) {
+  if (!oldNo || oldNo === newNo) return;
+  if (data.invs.some(i => i.no === oldNo)) return; // masih ada invoice lain yang memakai nomor lama -> biarkan
+  (data.sttps || []).forEach(sttp => {
+    if (Array.isArray(sttp.invNos)) sttp.invNos = sttp.invNos.map(n => n === oldNo ? newNo : n);
+    if (sttp.invNo === oldNo) sttp.invNo = newNo;
+  });
+  (data.payments || []).forEach(p => {
+    if (Array.isArray(p.invNos)) p.invNos = p.invNos.map(n => n === oldNo ? newNo : n);
+    if (Array.isArray(p.invBreakdown)) p.invBreakdown.forEach(b => { if (b.no === oldNo) b.no = newNo; });
+  });
+}
+
 function saveInv() {
   const data = loadData();
   const items = Array.from(document.getElementById('inv-items').querySelectorAll('tr')).map(row => ({
@@ -5744,15 +5760,24 @@ function saveInv() {
   const finalInvNo = document.getElementById('inv-no').value.trim() || generateNo('INV');
   let prevInvSoIds = []; // SJ yang sebelumnya terpasang di invoice ini (saat edit)
   const dupInv = data.invs.find(i => i.id !== editingInvId && (i.no || '').trim().toLowerCase() === finalInvNo.toLowerCase());
+  const editingInvRec = editingInvId ? data.invs.find(i => i.id === editingInvId) : null;
+  const invNoChanged = !!editingInvRec && (editingInvRec.no || '') !== finalInvNo;
   if (dupInv) {
     const dupCust = data.customers.find(c => c.id == dupInv.customer)?.name || 'customer lain';
+    // Tanda Terima & Pembayaran menaut ke invoice lewat NOMOR, jadi nomor yang diganti tidak boleh kembar
+    if (invNoChanged) {
+      alert(`Nomor Invoice "${finalInvNo}" sudah dipakai di Invoice lain (${dupCust}). Pakai nomor yang berbeda.`);
+      return;
+    }
     if (!confirm(`Nomor Invoice "${finalInvNo}" sudah dipakai di Invoice lain (${dupCust}). Tetap simpan?`)) return;
   }
   
   if (editingInvId) {
     const inv = data.invs.find(i => i.id === editingInvId);
     prevInvSoIds = getInvSoIds(inv).map(String);
+    const oldInvNo = inv.no;
     inv.no = finalInvNo;
+    if (oldInvNo !== finalInvNo) renameInvoiceNoReferences(data, oldInvNo, finalInvNo);
     inv.customer = document.getElementById('inv-customer').value;
     inv.date = document.getElementById('inv-date').value;
     inv.due = document.getElementById('inv-due').value;
@@ -5766,7 +5791,7 @@ function saveInv() {
     inv.soId = soRefIds[0] || null;
     inv.soNo = soRefs[0] ? soRefs[0].no : null;
     syncInvPaidFieldsWithStatus(inv);
-    logActivity(data, 'Invoice', 'Edit', `Merevisi Invoice ${inv.no}`);
+    logActivity(data, 'Invoice', 'Edit', `Merevisi Invoice ${inv.no}${oldInvNo !== inv.no ? ` (nomor lama ${oldInvNo})` : ''}`);
     showToast('Invoice berhasil direvisi!');
   } else {
     const inv = {
